@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialogue Forge - Visual Dialogue Editor</title>
+
+    <!-- CodeMirror for editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+
+    <!-- Cytoscape for graph -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>🎭 Dialogue Forge</h1>
+                <span class="subtitle">Visual .dlg Editor</span>
+            </div>
+            <div class="header-center">
+                <button id="guide-btn" class="btn btn-secondary" title="DLG Format Guide">
+                    <span>📖</span> Guide
+                </button>
+                <select id="file-selector" class="file-selector">
+                    <option value="">Select a dialogue file...</option>
+                </select>
+                <button id="refresh-files" class="btn btn-secondary" title="Refresh file list">
+                    <span>🔄</span>
+                </button>
+                <button id="new-file-btn" class="btn btn-secondary" title="Create new dialogue file">
+                    <span>📝</span> New
+                </button>
+            </div>
+            <div class="header-right">
+                <button id="reload-btn" class="btn btn-secondary" title="Reload file from disk (discard changes)" disabled>
+                    <span>↩️</span> Reload
+                </button>
+                <button id="save-btn" class="btn btn-secondary" title="Save changes to file (Ctrl+S)" disabled>
+                    <span>💾</span> Save
+                </button>
+                <button id="validate-btn" class="btn btn-primary">
+                    <span>✓</span> Validate
+                </button>
+                <button id="play-btn" class="btn btn-play" title="Play through dialogue (test)">
+                    <span>▶️</span> Play
+                </button>
+                <button id="import-state-btn" class="btn btn-secondary" title="Import game state into [state] section">
+                    <span>📥</span> Import State
+                </button>
+                <div class="export-dropdown">
+                    <button id="export-btn" class="btn btn-success">
+                        <span>📦</span> Export <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="export-menu hidden">
+                        <div class="export-menu-item" data-format="dlg">
+                            <span>📄</span> Export .dlg
+                        </div>
+                        <div class="export-menu-item" data-format="json">
+                            <span>📦</span> Export JSON
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content area -->
+        <div class="content">
+            <!-- Left panel: Editor -->
+            <div class="panel panel-editor">
+                <div class="panel-header">
+                    <h2>Editor</h2>
+                    <div class="panel-actions">
+                        <button id="vim-mode-btn" class="btn btn-sm" title="Toggle Vim mode">
+                            <span>⌨️</span> Vim
+                        </button>
+                        <button id="toggle-preview" class="btn btn-sm">
+                            <span>👁️</span> Auto-Preview
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <textarea id="editor"></textarea>
+                </div>
+                <div class="panel-footer">
+                    <div class="stats">
+                        <span class="stat">
+                            <span class="stat-label">Nodes:</span>
+                            <span id="stat-nodes" class="stat-value">0</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-label">Characters:</span>
+                            <span id="stat-characters" class="stat-value">0</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-label">Lines:</span>
+                            <span id="stat-lines" class="stat-value">0</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-label">Choices:</span>
+                            <span id="stat-choices" class="stat-value">0</span>
+                        </span>
+                        <span id="unsaved-indicator" class="stat unsaved-indicator hidden">
+                            <span class="stat-value warning">● Unsaved</span>
+                        </span>
+                        <span id="vim-indicator" class="stat vim-indicator hidden">
+                            <span class="stat-value vim">VIM</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resizer -->
+            <div class="resizer"></div>
+
+            <!-- Right panel: Graph visualization -->
+            <div class="panel panel-graph">
+                <div class="panel-header">
+                    <h2>Dialogue Graph</h2>
+                    <div class="panel-actions">
+                        <button id="fit-graph" class="btn btn-sm" title="Fit to screen">
+                            <span>⊡</span>
+                        </button>
+                        <button id="reset-zoom" class="btn btn-sm" title="Reset zoom">
+                            <span>🔍</span>
+                        </button>
+                        <select id="layout-selector" class="layout-selector">
+                            <option value="dagre">Tree Layout</option>
+                            <option value="breadthfirst">Breadth First</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div id="cy"></div>
+                    <div id="node-inspector" class="node-inspector hidden">
+                        <div class="inspector-header">
+                            <h3 id="inspector-title">Node Details</h3>
+                            <button id="close-inspector" class="btn-close">×</button>
+                        </div>
+                        <div class="inspector-body" id="inspector-content">
+                            <!-- Node details will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation panel (bottom, collapsible) -->
+        <div class="validation-panel" id="validation-panel">
+            <div class="validation-header">
+                <h3>
+                    <span id="validation-icon">ℹ️</span>
+                    <span id="validation-title">Validation Results</span>
+                </h3>
+                <button id="toggle-validation" class="btn-toggle">▼</button>
+            </div>
+            <div class="validation-body" id="validation-body">
+                <div class="validation-content" id="validation-content">
+                    <p class="validation-empty">Click "Validate" to check your dialogue</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Panel -->
+    <div id="guide-panel" class="guide-panel hidden">
+        <div class="guide-backdrop"></div>
+        <div class="guide-container">
+            <div class="guide-header">
+                <h2>📖 DLG Format Guide</h2>
+                <button id="close-guide" class="btn-close">×</button>
+            </div>
+            <div class="guide-body">
+                <!-- Quick Reference -->
+                <section class="guide-section guide-reference">
+                    <h3>Quick Reference</h3>
+                    <table class="guide-table">
+                        <tr><td><code>[characters]</code></td><td>Start character definitions</td></tr>
+                        <tr><td><code>id: Name</code></td><td>Define a character</td></tr>
+                        <tr><td><code>[state]</code></td><td>Initialize game state for scene</td></tr>
+                        <tr><td><code>[node_name]</code></td><td>Define a dialogue node</td></tr>
+                        <tr><td><code>speaker: "text"</code></td><td>Dialogue line</td></tr>
+                        <tr><td><code>-> target: "text"</code></td><td>Choice with text</td></tr>
+                        <tr><td><code>-> target</code></td><td>Auto-continue</td></tr>
+                        <tr><td><code>-> END</code></td><td>End conversation</td></tr>
+                        <tr><td><code>{condition}</code></td><td>Conditional choice</td></tr>
+                        <tr><td><code>*command</code></td><td>Game command</td></tr>
+                        <tr><td><code># comment</code></td><td>Comment (ignored)</td></tr>
+                    </table>
+                </section>
+
+                <!-- Comments -->
+                <section class="guide-section">
+                    <h3>Comments</h3>
+                    <p>Use <code>#</code> for comments anywhere:</p>
+                    <pre><code># Scene: Village Square - Morning
+[village_square]
+# TODO: Add more dialogue options here
+npc: "Good morning!"</code></pre>
+                </section>
+
+                <!-- What is DLG -->
+                <section class="guide-section">
+                    <h3>What is DLG?</h3>
+                    <p>DLG is a simple, human-readable format for writing branching dialogue. It's designed to be easy to write in any text editor while supporting complex game interactions.</p>
+                </section>
+
+                <!-- Basic Structure -->
+                <section class="guide-section">
+                    <h3>Basic Structure</h3>
+                    <p>Every DLG file has three optional sections: <strong>characters</strong>, <strong>state</strong>, and <strong>nodes</strong>.</p>
+                    <pre><code># Characters go first
+[characters]
+hero: Player Name
+npc: Village Elder
+narrator: Narrator
+
+# Optional: initialize state for this scene
+[state]
+*set talked_before = false
+*set reputation = 0
+*give_item torch
+
+# Then your dialogue nodes
+[start]
+npc: "Welcome, traveler!"
+-> greet: "Hello!"
+-> leave: "Goodbye." -> END</code></pre>
+                </section>
+
+                <!-- State Initialization -->
+                <section class="guide-section">
+                    <h3>State Initialization</h3>
+                    <p>The <code>[state]</code> section lets you define initial game state for testing and documentation:</p>
+                    <pre><code>[state]
+# Set variables
+*set has_key = false
+*set reputation = 0
+*set player_name = Korra
+
+# Give items
+*give_item torch
+*give_item map
+
+# Add companions
+*add_companion peng</code></pre>
+                    <p class="guide-tip">💡 The [state] section is executed <strong>before</strong> any dialogue starts. Use it to set up the scene's required state for testing!</p>
+                    <p>State carries between scenes in the game. The [state] section documents what state this dialogue expects and provides defaults for testing in the editor.</p>
+                </section>
+
+                <!-- Dialogue Lines -->
+                <section class="guide-section">
+                    <h3>Dialogue Lines</h3>
+                    <p>Each line has a speaker and quoted text:</p>
+                    <pre><code>npc: "What brings you here?"
+hero: "I'm looking for adventure!"
+narrator: "The wind howls outside."</code></pre>
+                    <p class="guide-tip">💡 <strong>narrator</strong> is special — it shows as italic scene description.</p>
+                </section>
+
+                <!-- Choices -->
+                <section class="guide-section">
+                    <h3>Choices</h3>
+                    <p>Choices use <code>-></code> to branch to other nodes:</p>
+                    <pre><code># Basic choice
+-> next_node: "What the player says"
+
+# Choice with action (not spoken)
+-> fight: [Attack the enemy]
+
+# Jump without text (auto-continues)
+-> another_node
+
+# End the conversation
+-> END</code></pre>
+                </section>
+
+                <!-- Conditions -->
+                <section class="guide-section">
+                    <h3>Conditions</h3>
+                    <p>Add <code>{condition}</code> to show choices only when conditions are met:</p>
+                    <pre><code># Simple flag check
+-> secret: "I know your secret" {found_diary}
+
+# Negation (show if NOT set)
+-> naive: "I trust you completely" {!knows_truth}
+
+# Item check
+-> use_key: "Use the key" {has_item:rusty_key}
+
+# Companion check
+-> ask_peng: "Peng, what do you think?" {companion:peng}
+
+# Numeric comparison
+-> brag: "I'm very experienced" {xp > 100}
+
+# Complex conditions
+-> special: "Special option" {has_key && talked_to_guard}</code></pre>
+                    <p class="guide-tip">💡 Operators: <code>&&</code> (and), <code>||</code> (or), <code>!</code> (not), <code>></code> <code><</code> <code>>=</code> <code><=</code> <code>==</code></p>
+                </section>
+
+                <!-- Commands -->
+                <section class="guide-section">
+                    <h3>Commands</h3>
+                    <p>Commands start with <code>*</code> and modify game state:</p>
+                    <pre><code># Set a flag
+*set talked_to_elder = true
+*set player_name = Korra
+
+# Add/subtract numbers
+*add harmony = 10
+*add xp = 50
+*sub gold = 25
+
+# Items
+*give_item rusty_key
+*remove_item old_map
+
+# Companions
+*add_companion peng
+*remove_companion temporary_ally
+
+# Custom commands (game-specific)
+*start_combat bandit_encounter
+*play_sound door_creak</code></pre>
+                    <p class="guide-tip">💡 You can create custom commands like <code>*start_combat</code> — your game decides how to handle them.</p>
+                </section>
+
+                <!-- Stacked Nodes -->
+                <section class="guide-section">
+                    <h3>Stacked Nodes</h3>
+                    <p>Multiple choices can lead to the same content:</p>
+                    <pre><code>[choice_a]
+[choice_b]
+[choice_c]
+npc: "Interesting choice..."
+-> continue</code></pre>
+                    <p>All three nodes share the same dialogue — perfect for converging branches.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- CodeMirror -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <!-- Vim mode addon -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/keymap/vim.min.js"></script>
+
+    <!-- Cytoscape layouts -->
+    <script src="https://unpkg.com/layout-base@1.0.2/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base@1.0.1/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+
+    <!-- Main app -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

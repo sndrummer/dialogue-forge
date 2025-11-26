@@ -1,0 +1,64 @@
+# Test dialogue to verify all DLG features export correctly to JSON
+
+[characters]
+hero: Test Hero
+npc: Test NPC
+merchant: Merchant
+
+[start]
+narrator: "Testing all dialogue features..."
+*set test_started = true
+*add xp = 10
+hero: "Let's test everything!"
+-> test_commands
+
+[test_commands]
+# Test all command types
+*set flag = true
+*add harmony = 5
+*sub discord = 2
+*give_item sword
+*remove_item old_sword
+*add_companion companion1
+*remove_companion companion2
+narrator: "Commands executed"
+-> test_conditions
+
+[test_conditions]
+npc: "Testing conditions..."
+-> simple_check: "Test simple flag" {test_started}
+-> negation_check: "Test negation" {!undefined_flag}
+-> item_check: "Test item" {has_item:sword}
+-> companion_check: "Test companion" {companion:companion1}
+-> complex_check: "Test complex" {test_started && has_item:sword}
+-> numeric_check: "Test numeric" {xp > 5}
+-> always_shown: "No condition"
+
+[simple_check]
+[negation_check]
+[item_check]
+[companion_check]
+[complex_check]
+[numeric_check]
+[always_shown]
+narrator: "All condition types tested"
+-> test_choices
+
+[test_choices]
+merchant: "Test choice types..."
+-> spoken_choice: "Spoken dialogue choice"
+-> action_choice: [Action in brackets]
+-> mixed_choice: "Dialogue" {with_condition}
+-> END: "End the test"
+
+[spoken_choice]
+hero: "I spoke!"
+-> END
+
+[action_choice]
+narrator: "You performed an action."
+-> END
+
+[mixed_choice]
+hero: "Conditional choice worked!"
+-> END

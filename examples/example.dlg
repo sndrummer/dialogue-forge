@@ -1,0 +1,73 @@
+# Simple Example Dialogue
+# Demonstrates basic Dialogue Forge features
+
+[characters]
+hero: Player
+elder: Village Elder
+merchant: Shop Merchant
+
+[state]
+*set gold = 100
+*set reputation = 0
+*set talked_to_elder = false
+
+[start]
+elder: "Welcome to our village, traveler!"
+elder: "I am the village elder. How may I help you?"
+-> ask_about_village: "Tell me about this place."
+-> ask_about_shop: "Where can I buy supplies?"
+-> END: "Just passing through. Goodbye."
+
+[ask_about_village]
+*set talked_to_elder = true
+*add reputation = 5
+elder: "This is a peaceful farming village."
+elder: "We've been here for generations."
+elder: "Feel free to look around!"
+-> ask_about_shop: "Where's the shop?"
+-> END: "Thank you. Farewell."
+
+[ask_about_shop]
+elder: "The merchant's shop is just down the road."
+elder: "Tell him I sent you!"
+-> visit_shop: "I'll go there now."
+-> END: "Thanks for the information."
+
+[visit_shop]
+merchant: "Welcome! What can I get for you?"
+-> buy_potion: "Health potion (20 gold)" {gold >= 20}
+-> buy_sword: "Steel sword (50 gold)" {gold >= 50}
+-> haggle: "Can you give me a discount?" {talked_to_elder}
+-> END: "Just browsing."
+
+[buy_potion]
+*sub gold = 20
+*give_item health_potion
+merchant: "Here you go! Stay safe out there."
+-> visit_shop
+
+[buy_sword]
+*sub gold = 50
+*give_item steel_sword
+merchant: "A fine choice! May it serve you well."
+-> visit_shop
+
+[haggle]
+merchant: "Ah, the elder sent you? I can do 10% off."
+*add reputation = 2
+merchant: "What would you like?"
+-> buy_potion_discount: "Health potion (18 gold)" {gold >= 18}
+-> buy_sword_discount: "Steel sword (45 gold)" {gold >= 45}
+-> END: "Maybe later."
+
+[buy_potion_discount]
+*sub gold = 18
+*give_item health_potion
+merchant: "Pleasure doing business!"
+-> visit_shop
+
+[buy_sword_discount]
+*sub gold = 45
+*give_item steel_sword
+merchant: "You drive a hard bargain!"
+-> visit_shop
