@@ -54,3 +54,7 @@ Thumbs.db
 # Local settings
 .claude/settings.local.json
 *.local.json
+
+# User dialogue files (ignore all except examples/)
+resources/dialogue/*
+!resources/dialogue/examples/

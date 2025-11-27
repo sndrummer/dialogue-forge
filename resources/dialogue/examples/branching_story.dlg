@@ -1,0 +1,121 @@
+# Branching Story Example
+# Demonstrates conditions, state, and multiple endings
+
+[characters]
+hero: You
+guard: Castle Guard
+king: The King
+prisoner: Mysterious Prisoner
+
+[state]
+*set has_permission = false
+*set bribed_guard = false
+*set freed_prisoner = false
+*set gold = 50
+
+[start]
+guard: "Halt! No one enters the castle without permission."
+-> talk_guard: "I need to see the King."
+-> bribe: "Perhaps this gold will change your mind?" {gold >= 30}
+-> force: "Step aside or face the consequences!"
+
+[talk_guard]
+guard: "The King isn't seeing visitors today."
+guard: "Come back another time."
+-> bribe: "What if I made it worth your while?" {gold >= 30}
+-> leave_gate: "Fine, I'll leave."
+
+[bribe]
+*sub gold = 30
+*set bribed_guard = true
+*set has_permission = true
+guard: "Well... I suppose I could look the other way."
+guard: "Go on in, but don't cause trouble."
+-> enter_castle
+
+[force]
+guard: "You dare threaten me?!"
+guard: "Guards! Seize this fool!"
+-> bad_ending
+
+[leave_gate]
+hero: "I'll find another way in..."
+-> sneak_in: "Look for a side entrance"
+-> give_up: "This isn't worth it"
+
+[sneak_in]
+hero: "There's a window around back..."
+*set has_permission = false
+-> enter_castle
+
+[enter_castle]
+hero: "The castle is grand but eerily quiet."
+-> throne_room: "Head to the throne room"
+-> dungeon: "Explore the dungeon" {!has_permission}
+-> dungeon_risky: "Sneak to the dungeon" {has_permission}
+
+[dungeon_risky]
+hero: "I shouldn't push my luck... but I'm curious."
+-> dungeon
+
+[dungeon]
+prisoner: "Please... help me. I've been falsely imprisoned."
+prisoner: "The King has gone mad with power."
+-> free_prisoner: "I'll help you escape."
+-> leave_prisoner: "I can't risk it."
+-> report_prisoner: "I'll tell the King you're plotting." {has_permission}
+
+[free_prisoner]
+*set freed_prisoner = true
+*give_item cell_key
+prisoner: "Thank you! Take this key - it opens a secret passage."
+prisoner: "Confront the King, but be careful."
+-> throne_room
+
+[leave_prisoner]
+prisoner: "Please... reconsider..."
+-> throne_room
+
+[report_prisoner]
+hero: "The King might reward me for this information."
+-> throne_room
+
+[throne_room]
+king: "Who dares enter my throne room?"
+-> confront_truth: "Your prisoner told me the truth!" {freed_prisoner}
+-> bow: "Your Majesty, I come with information." {report_prisoner}
+-> plea: "I seek an audience, Your Highness."
+
+[confront_truth]
+king: "That traitor! Guards!"
+hero: "But I have proof of your tyranny!"
+-> good_ending
+
+[bow]
+king: "Ah, a loyal subject. You shall be rewarded."
+*add gold = 100
+king: "Now leave me."
+-> neutral_ending
+
+[plea]
+king: "I have no time for peasants."
+king: "Remove this person from my sight."
+-> neutral_ending
+
+[good_ending]
+hero: "The people rise up against the tyrant King."
+hero: "A new era of justice begins."
+-> END
+
+[neutral_ending]
+hero: "I leave the castle, unsure if I made the right choices."
+-> END
+
+[bad_ending]
+hero: "I'm thrown in the dungeon."
+hero: "Perhaps I should have been more diplomatic..."
+-> END
+
+[give_up]
+hero: "Some battles aren't worth fighting."
+-> END

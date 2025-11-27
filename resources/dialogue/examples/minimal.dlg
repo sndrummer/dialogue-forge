@@ -1,0 +1,9 @@
+# Minimal Example
+# The simplest possible dialogue
+
+[characters]
+npc: Stranger
+
+[start]
+npc: "Hello, world!"
+-> END: "Goodbye."

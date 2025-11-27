@@ -217,8 +217,8 @@ def create_app(dialogues_root=None):
 
     # Default to repo_root/resources/dialogue if not specified
     if dialogues_root is None:
-        # From tools/dialogue/dialogue_forge/web/app.py -> go up 5 levels to repo root
-        dialogues_root = Path(__file__).parent.parent.parent.parent.parent / "resources" / "dialogue"
+        # From dialogue_forge/web/app.py -> go up 3 levels to repo root
+        dialogues_root = Path(__file__).parent.parent.parent / "resources" / "dialogue"
     else:
         dialogues_root = Path(dialogues_root)
 
