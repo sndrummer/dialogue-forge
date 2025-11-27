@@ -278,7 +278,7 @@ class DialoguePlayer {
                             <span>📊</span> State
                         </button>
                         <button class="btn btn-sm play-speed-btn" title="Toggle text speed">
-                            <span>📝</span> Normal
+                            <span>📝</span> Speed: Normal
                         </button>
                         <button class="btn btn-sm btn-close-play" title="Exit playback">
                             ✕
@@ -686,11 +686,11 @@ class DialoguePlayer {
         if (this.typewriterSpeed === 25) {
             // Switch to fast
             this.typewriterSpeed = 5;
-            btn.innerHTML = '<span>⚡</span> Fast';
+            btn.innerHTML = '<span>⚡</span> Speed: Fast';
         } else {
             // Switch to normal
             this.typewriterSpeed = 25;
-            btn.innerHTML = '<span>📝</span> Normal';
+            btn.innerHTML = '<span>📝</span> Speed: Normal';
         }
     }
 
