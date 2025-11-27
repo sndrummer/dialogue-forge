@@ -159,9 +159,10 @@ class DialoguePlayer {
         this.isPlaying = false;
         this.typewriterSpeed = 25; // ms per character (normal speed)
         this.modal = null;
+        this.visitedPath = []; // Track path taken during playback
     }
 
-    async play(startNode = null, initialState = null) {
+    async play(startNode = null, initialState = null, skipPathReset = false) {
         // Get parsed dialogue data
         const content = this.app.editor.getValue();
         try {
@@ -222,6 +223,12 @@ class DialoguePlayer {
             this.currentNode = startNodeId;
             this.isPlaying = true;
 
+            // Initialize path tracking (unless already set by playFromNode)
+            if (!skipPathReset) {
+                this.visitedPath = [startNodeId];
+                this.app.highlightPath(this.visitedPath, startNodeId);
+            }
+
             // Show the play modal
             this.showModal();
 
@@ -264,8 +271,18 @@ class DialoguePlayer {
                 this.app.showNotification(`${modeLabel} path: ${data.path_length} nodes`, 'success');
             }
 
+            // Initialize visited path with the computed path (up to target node)
+            if (data.path) {
+                this.visitedPath = [...data.path];
+                // Highlight the computed path with target as current
+                this.app.highlightPath(this.visitedPath, nodeId);
+            } else {
+                this.visitedPath = [nodeId];
+                this.app.highlightPath(this.visitedPath, nodeId);
+            }
+
             // Play from the target node with computed state
-            await this.play(nodeId, data.state);
+            await this.play(nodeId, data.state, true); // true = skip path reset
 
         } catch (error) {
             console.error('Play from node error:', error);
@@ -783,6 +800,12 @@ class DialoguePlayer {
 
         this.currentNode = nodeId;
         this.state.visitedNodes.add(nodeId);
+
+        // Track path and update graph highlight
+        if (!this.visitedPath.includes(nodeId)) {
+            this.visitedPath.push(nodeId);
+        }
+        this.app.highlightPath(this.visitedPath, nodeId);
 
         // Update node indicator
         const indicator = this.modal.querySelector('.play-node-indicator');
@@ -1485,6 +1508,31 @@ class DialogueForgeApp {
                     style: {
                         'line-color': '#8b5cf6',
                         'target-arrow-color': '#8b5cf6'
+                    }
+                },
+                // Path highlighting styles
+                {
+                    selector: 'node.path-visited',
+                    style: {
+                        'background-color': '#10b981',
+                        'border-color': '#34d399',
+                        'border-width': 3
+                    }
+                },
+                {
+                    selector: 'node.path-current',
+                    style: {
+                        'background-color': '#f59e0b',
+                        'border-color': '#fbbf24',
+                        'border-width': 4
+                    }
+                },
+                {
+                    selector: 'edge.path-taken',
+                    style: {
+                        'line-color': '#10b981',
+                        'target-arrow-color': '#10b981',
+                        'width': 3
                     }
                 }
             ],
@@ -2690,6 +2738,40 @@ Example DLG:
         }, 3000);
 
         console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+
+    // Path highlighting methods for dialogue playback visualization
+    clearPathHighlight() {
+        if (!this.cy) return;
+        this.cy.elements().removeClass('path-visited path-current path-taken');
+    }
+
+    highlightPath(path, currentNode = null) {
+        if (!this.cy || !path || path.length === 0) return;
+
+        // Clear previous highlights
+        this.clearPathHighlight();
+
+        // Highlight visited nodes (all except current)
+        for (let i = 0; i < path.length; i++) {
+            const nodeId = path[i];
+            const node = this.cy.getElementById(nodeId);
+            if (node.length > 0) {
+                if (currentNode && nodeId === currentNode) {
+                    node.addClass('path-current');
+                } else {
+                    node.addClass('path-visited');
+                }
+            }
+
+            // Highlight edge from this node to the next
+            if (i < path.length - 1) {
+                const nextNodeId = path[i + 1];
+                // Find edge between these nodes
+                const edges = this.cy.edges(`[source = "${nodeId}"][target = "${nextNodeId}"]`);
+                edges.addClass('path-taken');
+            }
+        }
     }
 
     escapeHtml(text) {
