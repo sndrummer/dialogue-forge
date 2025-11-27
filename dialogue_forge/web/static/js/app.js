@@ -234,7 +234,7 @@ class DialoguePlayer {
         }
     }
 
-    async playFromNode(nodeId) {
+    async playFromNode(nodeId, mode = 'shortest') {
         // Compute path and state to reach this node
         const content = this.app.editor.getValue();
 
@@ -242,7 +242,7 @@ class DialoguePlayer {
             const response = await fetch('/api/compute-path', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content, target_node: nodeId })
+                body: JSON.stringify({ content, target_node: nodeId, mode })
             });
             const data = await response.json();
 
@@ -253,6 +253,15 @@ class DialoguePlayer {
 
             if (data.warning) {
                 this.app.showNotification(data.warning, 'warning');
+            } else if (data.path_length) {
+                // Show path info for non-warning cases
+                const modeLabels = {
+                    'shortest': 'Shortest',
+                    'random': 'Random',
+                    'explore': 'Exploratory'
+                };
+                const modeLabel = modeLabels[mode] || mode;
+                this.app.showNotification(`${modeLabel} path: ${data.path_length} nodes`, 'success');
             }
 
             // Play from the target node with computed state
@@ -1108,9 +1117,16 @@ class DialogueForgeApp {
         this.contextMenu = document.createElement('div');
         this.contextMenu.className = 'context-menu hidden';
         this.contextMenu.innerHTML = `
-            <div class="context-menu-item" data-action="play-from">
-                <span>▶️</span> Play from here
+            <div class="context-menu-item" data-action="play-shortest">
+                <span>▶️</span> Play (shortest path)
             </div>
+            <div class="context-menu-item" data-action="play-random">
+                <span>🎲</span> Play (random path)
+            </div>
+            <div class="context-menu-item" data-action="play-explore">
+                <span>🗺️</span> Play (explore path)
+            </div>
+            <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="edit">
                 <span>✏️</span> Edit in editor
             </div>
@@ -1135,8 +1151,12 @@ class DialogueForgeApp {
 
             if (action === 'edit' && nodeId) {
                 this.scrollToNodeInEditor(nodeId);
-            } else if (action === 'play-from' && nodeId) {
-                this.dialoguePlayer.playFromNode(nodeId);
+            } else if (action === 'play-shortest' && nodeId) {
+                this.dialoguePlayer.playFromNode(nodeId, 'shortest');
+            } else if (action === 'play-random' && nodeId) {
+                this.dialoguePlayer.playFromNode(nodeId, 'random');
+            } else if (action === 'play-explore' && nodeId) {
+                this.dialoguePlayer.playFromNode(nodeId, 'explore');
             } else if (action === 'inspect' && nodeId) {
                 const node = this.cy.getElementById(nodeId);
                 if (node) {

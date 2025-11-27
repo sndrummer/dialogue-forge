@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import sys
 import re
+import random
 from collections import deque
 from typing import Dict, Set, Any, List, Tuple, Optional
 
@@ -209,6 +210,197 @@ def find_valid_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[s
     # No path found - target might be unreachable
     # Return path to target anyway with empty state (for testing purposes)
     return None, None
+
+
+def find_random_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[str]], Optional[WebGameState]]:
+    """
+    Find a random valid path from start to target_node using randomized DFS.
+    Returns (path, final_state) or (None, None) if unreachable.
+
+    Unlike BFS, this shuffles choices at each node to explore a random path.
+    Equal probability for each valid choice at every branch point.
+    """
+    initial_state = WebGameState()
+    for cmd in dialogue.initial_state:
+        initial_state.execute_command(cmd)
+
+    if target_node == dialogue.start_node:
+        state = initial_state.copy()
+        if target_node in dialogue.nodes:
+            for cmd in dialogue.nodes[target_node].commands:
+                state.execute_command(cmd)
+        return [target_node], state
+
+    if target_node not in dialogue.nodes and target_node != 'END':
+        return None, None
+
+    # Execute commands at start node
+    if dialogue.start_node in dialogue.nodes:
+        for cmd in dialogue.nodes[dialogue.start_node].commands:
+            initial_state.execute_command(cmd)
+
+    # Randomized DFS using a stack
+    stack = [(dialogue.start_node, [dialogue.start_node], initial_state)]
+    visited = {(dialogue.start_node, frozenset(), frozenset(), frozenset(initial_state.variables.items()))}
+
+    while stack:
+        current_node, path, state = stack.pop()
+
+        if current_node == target_node:
+            return path, state
+
+        if current_node not in dialogue.nodes:
+            continue
+
+        node = dialogue.nodes[current_node]
+
+        # Get valid choices and shuffle them for randomness
+        valid_choices = []
+        for choice in node.choices:
+            if state.evaluate_condition(choice.condition):
+                valid_choices.append(choice)
+
+        random.shuffle(valid_choices)
+
+        for choice in valid_choices:
+            next_node = choice.target
+
+            if next_node == 'END':
+                if target_node == 'END':
+                    return path + ['END'], state
+                continue
+
+            if next_node not in dialogue.nodes:
+                continue
+
+            new_state = state.copy()
+            for cmd in dialogue.nodes[next_node].commands:
+                new_state.execute_command(cmd)
+
+            state_sig = (
+                next_node,
+                frozenset(new_state.inventory),
+                frozenset(new_state.companions),
+                frozenset(new_state.variables.items())
+            )
+
+            if state_sig not in visited:
+                visited.add(state_sig)
+                stack.append((next_node, path + [next_node], new_state))
+
+    return None, None
+
+
+def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[str]], Optional[WebGameState]]:
+    """
+    Find a path that prefers longer/less common routes to target_node.
+    Returns (path, final_state) or (None, None) if unreachable.
+
+    Uses randomized DFS with bias toward:
+    - Nodes with more content (lines + choices)
+    - Longer paths (depth-first naturally explores deeper)
+    - Random selection among equally-weighted choices
+    """
+    initial_state = WebGameState()
+    for cmd in dialogue.initial_state:
+        initial_state.execute_command(cmd)
+
+    if target_node == dialogue.start_node:
+        state = initial_state.copy()
+        if target_node in dialogue.nodes:
+            for cmd in dialogue.nodes[target_node].commands:
+                state.execute_command(cmd)
+        return [target_node], state
+
+    if target_node not in dialogue.nodes and target_node != 'END':
+        return None, None
+
+    if dialogue.start_node in dialogue.nodes:
+        for cmd in dialogue.nodes[dialogue.start_node].commands:
+            initial_state.execute_command(cmd)
+
+    # Track all valid paths found, then return the longest
+    all_paths = []
+    stack = [(dialogue.start_node, [dialogue.start_node], initial_state)]
+    visited = {(dialogue.start_node, frozenset(), frozenset(), frozenset(initial_state.variables.items()))}
+
+    # Limit iterations to prevent infinite loops in large graphs
+    max_iterations = 10000
+    iterations = 0
+
+    while stack and iterations < max_iterations:
+        iterations += 1
+        current_node, path, state = stack.pop()
+
+        if current_node == target_node:
+            all_paths.append((path, state))
+            # Continue searching for more paths (up to a limit)
+            if len(all_paths) >= 20:
+                break
+            continue
+
+        if current_node not in dialogue.nodes:
+            continue
+
+        node = dialogue.nodes[current_node]
+
+        # Score and sort choices to prefer "interesting" paths
+        scored_choices = []
+        for choice in node.choices:
+            if not state.evaluate_condition(choice.condition):
+                continue
+
+            next_node = choice.target
+            score = 0
+
+            if next_node == 'END':
+                if target_node == 'END':
+                    all_paths.append((path + ['END'], state))
+                continue
+
+            if next_node in dialogue.nodes:
+                next_node_data = dialogue.nodes[next_node]
+                # Prefer nodes with more content
+                score += len(next_node_data.lines) * 2
+                score += len(next_node_data.choices)
+                score += len(next_node_data.commands)
+                # Add randomness to break ties and vary paths
+                score += random.random() * 3
+
+            scored_choices.append((score, choice))
+
+        # Sort by score (lower first since we pop from end of stack)
+        scored_choices.sort(key=lambda x: x[0])
+
+        for _, choice in scored_choices:
+            next_node = choice.target
+
+            if next_node == 'END' or next_node not in dialogue.nodes:
+                continue
+
+            new_state = state.copy()
+            for cmd in dialogue.nodes[next_node].commands:
+                new_state.execute_command(cmd)
+
+            state_sig = (
+                next_node,
+                frozenset(new_state.inventory),
+                frozenset(new_state.companions),
+                frozenset(new_state.variables.items())
+            )
+
+            if state_sig not in visited:
+                visited.add(state_sig)
+                stack.append((next_node, path + [next_node], new_state))
+
+    if not all_paths:
+        return None, None
+
+    # Return a random path from the longer ones (top 50% by length)
+    all_paths.sort(key=lambda x: len(x[0]), reverse=True)
+    top_half = all_paths[:max(1, len(all_paths) // 2)]
+    chosen = random.choice(top_half)
+    return chosen
 
 
 def create_app(dialogues_root=None):
@@ -452,10 +644,16 @@ def create_app(dialogues_root=None):
         """
         Compute a valid path from start to a target node, along with the
         accumulated game state at that point. Used for "Play from here" feature.
+
+        Accepts optional 'mode' parameter:
+        - 'shortest' (default): BFS to find shortest valid path
+        - 'random': Randomized DFS with equal probability at each choice
+        - 'explore': Biased toward longer/more interesting paths
         """
         data = request.json
         content = data.get('content', '')
         target_node = data.get('target_node', '')
+        mode = data.get('mode', 'shortest')
 
         if not target_node:
             return jsonify({'error': 'No target node specified'}), 400
@@ -466,8 +664,13 @@ def create_app(dialogues_root=None):
             lines = content.split('\n')
             dialogue = parser.parse_lines(lines)
 
-            # Find valid path to target
-            path, state = find_valid_path_to_node(dialogue, target_node)
+            # Select pathfinding algorithm based on mode
+            if mode == 'random':
+                path, state = find_random_path_to_node(dialogue, target_node)
+            elif mode == 'explore':
+                path, state = find_exploratory_path_to_node(dialogue, target_node)
+            else:  # 'shortest' or default
+                path, state = find_valid_path_to_node(dialogue, target_node)
 
             if path is None:
                 # No valid path found - start with empty state
@@ -481,6 +684,8 @@ def create_app(dialogues_root=None):
             return jsonify({
                 'success': True,
                 'path': path,
+                'path_length': len(path),
+                'mode': mode,
                 'state': state.to_dict()
             })
 

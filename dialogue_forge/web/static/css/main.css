@@ -627,6 +627,12 @@ body {
     font-size: 16px;
 }
 
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
 /* Play Modal */
 .play-modal {
     position: fixed;
