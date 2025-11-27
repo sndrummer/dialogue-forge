@@ -188,10 +188,11 @@
                         <tr><td><code>[node_name]</code></td><td>Define a dialogue node</td></tr>
                         <tr><td><code>speaker: "text"</code></td><td>Dialogue line</td></tr>
                         <tr><td><code>speaker: "long<br>  text"</code></td><td>Multi-line (unclosed quote)</td></tr>
-                        <tr><td><code>-> target: "text"</code></td><td>Choice with text</td></tr>
-                        <tr><td><code>-> target</code></td><td>Auto-continue</td></tr>
+                        <tr><td><code>-> target: "text"</code></td><td>Player choice</td></tr>
+                        <tr><td><code>-> target</code></td><td>Auto-transition (GOTO)</td></tr>
+                        <tr><td><code>-> target {cond}</code></td><td>Conditional GOTO</td></tr>
                         <tr><td><code>-> END</code></td><td>End conversation</td></tr>
-                        <tr><td><code>{condition}</code></td><td>Conditional choice</td></tr>
+                        <tr><td><code>{condition}</code></td><td>Condition on choice</td></tr>
                         <tr><td><code>*command</code></td><td>Game command</td></tr>
                         <tr><td><code># comment</code></td><td>Comment (ignored)</td></tr>
                     </table>
@@ -280,21 +281,22 @@ narrator: "The wind howls outside."</code></pre>
                     <p class="guide-tip">💡 Indent continuation lines for readability. Empty lines and comments within multi-line text are skipped.</p>
                 </section>
 
-                <!-- Choices -->
+                <!-- Choices and Transitions -->
                 <section class="guide-section">
-                    <h3>Choices</h3>
-                    <p>Choices use <code>-></code> to branch to other nodes:</p>
-                    <pre><code># Basic choice
+                    <h3>Choices &amp; Transitions</h3>
+                    <p>Use <code>-></code> to branch. The <strong>colon</strong> distinguishes player choices from automatic transitions:</p>
+                    <pre><code># PLAYER CHOICES (have colon + text)
 -> next_node: "What the player says"
-
-# Choice with action (not spoken)
 -> fight: [Attack the enemy]
 
-# Jump without text (auto-continues)
--> another_node
+# AUTOMATIC TRANSITIONS (no colon = GOTO)
+-> another_node          # unconditional
+-> path_a {has_key}      # conditional GOTO
+-> path_b {!has_key}     # like if/else branching
 
 # End the conversation
 -> END</code></pre>
+                    <p class="guide-tip">💡 GOTOs are automatic — the player never sees them. Use them for branching logic based on game state!</p>
                 </section>
 
                 <!-- Conditions -->

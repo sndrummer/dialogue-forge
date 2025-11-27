@@ -894,28 +894,40 @@ class DialoguePlayer {
     async showChoices(choices) {
         if (!this.isPlaying) return;
 
-        // Separate choices into available and disabled
-        const availableChoices = [];
+        // Separate GOTOs (no text) from player choices (with text)
+        // GOTOs are automatic transitions, choices are presented to the player
+        const gotos = [];
+        const playerChoices = [];
         const disabledChoices = [];
 
         for (const choice of choices) {
-            if (this.state.evaluateCondition(choice.condition)) {
-                availableChoices.push(choice);
+            if (choice.text) {
+                // This is a player choice
+                if (this.state.evaluateCondition(choice.condition)) {
+                    playerChoices.push(choice);
+                } else {
+                    disabledChoices.push(choice);
+                }
             } else {
-                disabledChoices.push(choice);
+                // This is a GOTO (automatic transition)
+                gotos.push(choice);
             }
         }
 
-        if (availableChoices.length === 0) {
-            // Dead end
-            await this.showEnding();
-            return;
+        // First, check GOTOs - find first one with true condition (or no condition)
+        for (const goto of gotos) {
+            if (this.state.evaluateCondition(goto.condition)) {
+                // Auto-transition to this target
+                await this.delay(300);
+                await this.playNode(goto.target);
+                return;
+            }
         }
 
-        // Check for auto-continue (single choice with no text)
-        if (availableChoices.length === 1 && !availableChoices[0].text && disabledChoices.length === 0) {
-            await this.delay(500);
-            await this.playNode(availableChoices[0].target);
+        // No GOTOs matched, check if we have player choices
+        if (playerChoices.length === 0) {
+            // Dead end
+            await this.showEnding();
             return;
         }
 
@@ -929,17 +941,13 @@ class DialoguePlayer {
             scrollArea.scrollTop = scrollArea.scrollHeight;
         }, 50);
 
-        // Render available choices first
-        for (let i = 0; i < availableChoices.length; i++) {
-            const choice = availableChoices[i];
+        // Render player choices
+        for (let i = 0; i < playerChoices.length; i++) {
+            const choice = playerChoices[i];
             const btn = document.createElement('button');
             btn.className = 'play-choice-btn';
 
-            if (choice.text) {
-                btn.innerHTML = `<span class="choice-number">${i + 1}</span> ${this.escapeHtml(choice.text)}`;
-            } else {
-                btn.innerHTML = `<span class="choice-number">${i + 1}</span> <span class="choice-continue">Continue...</span>`;
-            }
+            btn.innerHTML = `<span class="choice-number">${i + 1}</span> ${this.escapeHtml(choice.text)}`;
 
             if (choice.condition) {
                 btn.classList.add('conditional');
@@ -948,9 +956,7 @@ class DialoguePlayer {
 
             btn.addEventListener('click', async () => {
                 // Show player's choice in dialogue
-                if (choice.text) {
-                    await this.displayDialogueLine('hero', choice.text);
-                }
+                await this.displayDialogueLine('hero', choice.text);
 
                 choicesArea.classList.add('hidden');
                 await this.playNode(choice.target);
@@ -959,7 +965,7 @@ class DialoguePlayer {
             choicesArea.appendChild(btn);
         }
 
-        // Render disabled choices (grayed out, not clickable)
+        // Render disabled choices (grayed out, not clickable) - only player choices, not GOTOs
         for (const choice of disabledChoices) {
             const btn = document.createElement('button');
             btn.className = 'play-choice-btn disabled';
@@ -969,12 +975,7 @@ class DialoguePlayer {
                 ? `<span class="choice-condition-badge">{${this.escapeHtml(choice.condition)}}</span>`
                 : '';
 
-            if (choice.text) {
-                btn.innerHTML = `<span class="choice-number disabled">✗</span> ${this.escapeHtml(choice.text)} ${conditionHtml}`;
-            } else {
-                btn.innerHTML = `<span class="choice-number disabled">✗</span> <span class="choice-continue">→ ${this.escapeHtml(choice.target)}</span> ${conditionHtml}`;
-            }
-
+            btn.innerHTML = `<span class="choice-number disabled">✗</span> ${this.escapeHtml(choice.text)} ${conditionHtml}`;
             btn.title = `Condition not met: ${choice.condition || 'unknown'}`;
 
             choicesArea.appendChild(btn);
@@ -989,13 +990,11 @@ class DialoguePlayer {
             }
 
             const num = parseInt(e.key, 10);
-            if (num >= 1 && num <= availableChoices.length) {
+            if (num >= 1 && num <= playerChoices.length) {
                 document.removeEventListener('keydown', choiceHandler);
-                const choice = availableChoices[num - 1];
+                const choice = playerChoices[num - 1];
 
-                if (choice.text) {
-                    await this.displayDialogueLine('hero', choice.text);
-                }
+                await this.displayDialogueLine('hero', choice.text);
 
                 choicesArea.classList.add('hidden');
                 await this.playNode(choice.target);

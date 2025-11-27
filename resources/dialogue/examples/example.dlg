@@ -74,3 +74,24 @@ merchant: "Pleasure doing business!"
 *give_item steel_sword
 merchant: "You drive a hard bargain!"
 -> visit_shop
+
+# ============================================================
+# Conditional GOTO Example
+# GOTOs (no colon) are automatic transitions - the player never sees them.
+# Use them for branching logic based on game state.
+# ============================================================
+
+[leaving_village]
+elder: "Safe travels!"
+# Conditional GOTOs: the first true condition is followed automatically
+-> reputation_farewell {reputation >= 5}
+-> standard_farewell
+
+[reputation_farewell]
+elder: "You've been a great friend to our village. Come back anytime!"
+*set village_friend = true
+-> END
+
+[standard_farewell]
+elder: "May the road rise to meet you."
+-> END

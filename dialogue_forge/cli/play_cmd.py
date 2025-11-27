@@ -360,34 +360,40 @@ class DialoguePlayer:
                 # NPC dialogue in cyan box
                 print(self.format_dialogue_box(text, speaker_name, Colors.BRIGHT_CYAN))
 
-        # Get available choices (filtered by conditions)
-        available_choices = []
+        # Separate GOTOs (no text) from player choices (with text)
+        # GOTOs are automatic transitions, choices are presented to the player
+        gotos = []
+        player_choices = []
         for choice in node.choices:
-            if self.state.evaluate_condition(choice.condition, verbose=self.verbose):
-                available_choices.append(choice)
+            if choice.text:
+                # This is a player choice - only include if condition passes
+                if self.state.evaluate_condition(choice.condition, verbose=self.verbose):
+                    player_choices.append(choice)
+            else:
+                # This is a GOTO (automatic transition)
+                gotos.append(choice)
 
-        if not available_choices:
-            # No choices available, this is a dead end or auto-continue
+        # First, check GOTOs - find first one with true condition (or no condition)
+        for goto in gotos:
+            if self.state.evaluate_condition(goto.condition, verbose=self.verbose):
+                # Auto-transition to this target
+                if self.verbose:
+                    cond_str = f" (condition: {goto.condition})" if goto.condition else ""
+                    print(f"{Colors.DIM}[Auto-transition → {goto.target}{cond_str}]{Colors.RESET}")
+                self.current_node = goto.target
+                return
+
+        # No GOTOs matched, check if we have player choices
+        if not player_choices:
+            # No choices available, this is a dead end
             self.current_node = None
             return
 
-        # Display choices
+        # Display player choices
         print(f"\n{Colors.DIM}{'─'*50}{Colors.RESET}")
-        for i, choice in enumerate(available_choices, 1):
-            if choice.text:
-                # Show choice text
-                cond_indicator = f" {Colors.BRIGHT_YELLOW}✓{Colors.RESET}" if choice.condition else ""
-                print(f"  {Colors.BRIGHT_YELLOW}[{i}]{Colors.RESET} {Colors.YELLOW}{choice.text}{Colors.RESET}{cond_indicator}")
-            else:
-                # Just a jump target
-                print(f"  {Colors.BRIGHT_YELLOW}[{i}]{Colors.RESET} {Colors.DIM}Continue → {choice.target}{Colors.RESET}")
-
-        # Handle special single-choice auto-continue
-        if len(available_choices) == 1 and not available_choices[0].text:
-            print(f"\n{Colors.DIM}[Press Enter to continue...]{Colors.RESET}")
-            input()
-            self.current_node = available_choices[0].target
-            return
+        for i, choice in enumerate(player_choices, 1):
+            cond_indicator = f" {Colors.BRIGHT_YELLOW}✓{Colors.RESET}" if choice.condition else ""
+            print(f"  {Colors.BRIGHT_YELLOW}[{i}]{Colors.RESET} {Colors.YELLOW}{choice.text}{Colors.RESET}{cond_indicator}")
 
         # Get player input
         while True:
@@ -413,8 +419,8 @@ class DialoguePlayer:
 
                 # Try to parse as choice number
                 choice_num = int(user_input)
-                if 1 <= choice_num <= len(available_choices):
-                    selected = available_choices[choice_num - 1]
+                if 1 <= choice_num <= len(player_choices):
+                    selected = player_choices[choice_num - 1]
 
                     # Show player's choice in a dialogue box
                     if selected.text:

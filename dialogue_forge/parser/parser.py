@@ -479,8 +479,24 @@ class DialogueParser:
         # Remove -> prefix
         choice_text = line[2:].strip()
 
+        # Determine if this is a player choice (has colon before any condition)
+        # or a GOTO (no colon, or colon only inside condition)
+        # -> target: "text" = choice (colon before { or no {)
+        # -> target {condition} = conditional GOTO (colon only inside {})
+        has_colon = ':' in choice_text
+        has_condition = '{' in choice_text
+
+        # Check if colon comes before the condition brace
+        colon_before_condition = False
+        if has_colon and has_condition:
+            colon_pos = choice_text.index(':')
+            brace_pos = choice_text.index('{')
+            colon_before_condition = colon_pos < brace_pos
+        elif has_colon and not has_condition:
+            colon_before_condition = True
+
         # Parse target and text
-        if ':' in choice_text:
+        if colon_before_condition:
             target, rest = choice_text.split(':', 1)
             target = target.strip()
             rest = rest.strip()
@@ -545,13 +561,36 @@ class DialogueParser:
                 line_number=start_index + 1
             )
         else:
-            # Simple target without text (like -> END)
-            choice = Choice(
-                target=choice_text,
-                text="",
-                condition=None,
-                line_number=start_index + 1
-            )
+            # No colon - could be simple GOTO or conditional GOTO
+            # -> target OR -> target {condition}
+            if '{' in choice_text:
+                # Conditional GOTO: -> target {condition}
+                cond_start = choice_text.index('{')
+                target = choice_text[:cond_start].strip()
+                condition = choice_text[cond_start:].strip()
+                # Remove the curly braces
+                if condition.startswith('{') and condition.endswith('}'):
+                    condition = condition[1:-1].strip()
+
+                # Validate condition syntax
+                if condition:
+                    condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
+                    self.dialogue.warnings.extend(condition_warnings)
+
+                choice = Choice(
+                    target=target,
+                    text="",  # No text for conditional GOTO
+                    condition=condition,
+                    line_number=start_index + 1
+                )
+            else:
+                # Simple GOTO without condition (like -> END or -> next_node)
+                choice = Choice(
+                    target=choice_text,
+                    text="",
+                    condition=None,
+                    line_number=start_index + 1
+                )
 
         node.choices.append(choice)
         return next_index

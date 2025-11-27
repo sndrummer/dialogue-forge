@@ -358,6 +358,177 @@ unknown_speaker: "Hello"
         assert any('unknown_speaker' in warn for warn in dialogue.warnings)
 
 
+class TestConditionalGOTOs:
+    """Test conditional GOTO parsing (-> target {condition})."""
+
+    def test_simple_conditional_goto(self):
+        """Test parsing a simple conditional GOTO."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "What happens?"
+-> branch_a {has_key}
+-> branch_b
+
+[branch_a]
+hero: "Took branch A"
+-> END
+
+[branch_b]
+hero: "Took branch B"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        choices = dialogue.nodes['start'].choices
+        assert len(choices) == 2
+        # First choice: conditional GOTO
+        assert choices[0].target == 'branch_a'
+        assert choices[0].text == ''
+        assert choices[0].condition == 'has_key'
+        # Second choice: unconditional GOTO
+        assert choices[1].target == 'branch_b'
+        assert choices[1].text == ''
+        assert choices[1].condition is None
+
+    def test_multiple_conditional_gotos(self):
+        """Test multiple conditional GOTOs (like if/elif/else)."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "Branching logic..."
+-> peng_path {peng_saved}
+-> alternate_path {!peng_saved && has_key}
+-> default_path
+
+[peng_path]
+hero: "Peng is here!"
+-> END
+
+[alternate_path]
+hero: "Alternate route."
+-> END
+
+[default_path]
+hero: "Default."
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        choices = dialogue.nodes['start'].choices
+        assert len(choices) == 3
+        assert choices[0].target == 'peng_path'
+        assert choices[0].condition == 'peng_saved'
+        assert choices[1].target == 'alternate_path'
+        assert choices[1].condition == '!peng_saved && has_key'
+        assert choices[2].target == 'default_path'
+        assert choices[2].condition is None
+
+    def test_mixed_gotos_and_choices(self):
+        """Test mixing conditional GOTOs with player choices."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "Choose wisely..."
+-> auto_branch {secret_unlocked}
+-> option_a: "Option A"
+-> option_b: "Option B" {has_permission}
+-> END
+
+[auto_branch]
+hero: "Secret path!"
+-> END
+
+[option_a]
+hero: "You chose A"
+-> END
+
+[option_b]
+hero: "You chose B"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        choices = dialogue.nodes['start'].choices
+        assert len(choices) == 4
+        # GOTO with condition
+        assert choices[0].target == 'auto_branch'
+        assert choices[0].text == ''
+        assert choices[0].condition == 'secret_unlocked'
+        # Player choice without condition
+        assert choices[1].target == 'option_a'
+        assert choices[1].text == 'Option A'
+        assert choices[1].condition is None
+        # Player choice with condition
+        assert choices[2].target == 'option_b'
+        assert choices[2].text == 'Option B'
+        assert choices[2].condition == 'has_permission'
+        # Simple END
+        assert choices[3].target == 'END'
+        assert choices[3].text == ''
+
+    def test_conditional_goto_with_complex_condition(self):
+        """Test conditional GOTO with complex boolean condition."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "Complex check..."
+-> success {has_item:key && reputation > 10 || is_vip}
+-> failure
+
+[success]
+hero: "Success!"
+-> END
+
+[failure]
+hero: "Failed."
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        choices = dialogue.nodes['start'].choices
+        assert choices[0].target == 'success'
+        assert choices[0].condition == 'has_item:key && reputation > 10 || is_vip'
+
+    def test_conditional_goto_negation(self):
+        """Test conditional GOTO with negation."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "Check..."
+-> path_a {!enemy_defeated}
+-> path_b {enemy_defeated}
+
+[path_a]
+hero: "A"
+-> END
+
+[path_b]
+hero: "B"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        choices = dialogue.nodes['start'].choices
+        assert choices[0].condition == '!enemy_defeated'
+        assert choices[1].condition == 'enemy_defeated'
+
+
 class TestStateSection:
     """Test [state] section parsing."""
 
