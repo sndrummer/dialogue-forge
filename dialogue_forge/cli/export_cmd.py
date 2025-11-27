@@ -36,7 +36,14 @@ def export_to_json(dlg_path: Path, output_path: Path = None):
     # Convert each node
     for node_id, node in dialogue.nodes.items():
         json_data["nodes"][node_id] = {
-            "lines": node.lines,
+            "lines": [
+                {
+                    "speaker": line.speaker,
+                    "text": line.text,
+                    "condition": line.condition
+                }
+                for line in node.lines
+            ],
             "commands": node.commands,
             "choices": [
                 {

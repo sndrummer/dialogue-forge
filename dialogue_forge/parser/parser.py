@@ -18,10 +18,19 @@ class Choice:
 
 
 @dataclass
+class DialogueLine:
+    """Represents a single dialogue line with optional condition"""
+    speaker: str
+    text: str
+    condition: Optional[str] = None
+    line_number: int = 0
+
+
+@dataclass
 class DialogueNode:
     """Represents a dialogue node"""
     id: str
-    lines: List[Tuple[str, str]] = field(default_factory=list)  # (speaker, text) pairs
+    lines: List[DialogueLine] = field(default_factory=list)
     choices: List[Choice] = field(default_factory=list)
     commands: List[str] = field(default_factory=list)
     line_number: int = 0
@@ -328,12 +337,48 @@ class DialogueParser:
 
             # Parse speaker line
             if ':' in stripped and not stripped.startswith('{'):
-                speaker, text = stripped.split(':', 1)
-                # Remove quotes if present
-                text = text.strip()
+                speaker, rest = stripped.split(':', 1)
+                rest = rest.strip()
+
+                # Extract condition if present (at the end after quoted text)
+                condition = None
+                text = rest
+
+                if '{' in rest:
+                    # Check if the { appears after the last quote (if quotes exist)
+                    if '"' in rest:
+                        if rest.rindex('{') > rest.rindex('"'):
+                            cond_start = rest.rindex('{')
+                            text = rest[:cond_start].strip()
+                            condition = rest[cond_start:].strip()
+                            # Remove the curly braces
+                            if condition.startswith('{') and condition.endswith('}'):
+                                condition = condition[1:-1].strip()
+                    else:
+                        # No quotes, so check if { is at the end
+                        cond_start = rest.rindex('{')
+                        text = rest[:cond_start].strip()
+                        condition = rest[cond_start:].strip()
+                        # Remove the curly braces
+                        if condition.startswith('{') and condition.endswith('}'):
+                            condition = condition[1:-1].strip()
+
+                # Remove quotes from text
                 if text.startswith('"') and text.endswith('"'):
                     text = text[1:-1]
-                primary_node.lines.append((speaker.strip(), text))
+
+                # Validate condition syntax if present
+                if condition:
+                    condition_warnings = self.validate_condition_syntax(condition, i + 1)
+                    self.dialogue.warnings.extend(condition_warnings)
+
+                dialogue_line = DialogueLine(
+                    speaker=speaker.strip(),
+                    text=text,
+                    condition=condition,
+                    line_number=i + 1
+                )
+                primary_node.lines.append(dialogue_line)
                 i += 1
                 continue
 
@@ -432,10 +477,10 @@ class DialogueParser:
 
         # Check for undefined speakers
         for node_id, node in self.dialogue.nodes.items():
-            for speaker, text in node.lines:
-                if speaker not in self.dialogue.characters:
+            for line in node.lines:
+                if line.speaker not in self.dialogue.characters:
                     self.dialogue.warnings.append(
-                        f"Node '{node_id}': Speaker '{speaker}' not defined in [characters] section"
+                        f"Node '{node_id}': Speaker '{line.speaker}' not defined in [characters] section"
                     )
 
         # Check for unreachable nodes

@@ -750,9 +750,12 @@ class DialoguePlayer {
         // Update stats display
         this.updateStatsDisplay();
 
-        // Display dialogue lines with typewriter effect
+        // Display dialogue lines with typewriter effect (filter by condition)
         for (const line of node.lines) {
-            await this.displayDialogueLine(line.speaker, line.text);
+            // Only show lines whose conditions are met (or have no condition)
+            if (this.state.evaluateCondition(line.condition)) {
+                await this.displayDialogueLine(line.speaker, line.text);
+            }
         }
 
         // Show choices
@@ -851,10 +854,17 @@ class DialoguePlayer {
     async showChoices(choices) {
         if (!this.isPlaying) return;
 
-        // Filter choices by conditions
-        const availableChoices = choices.filter(choice =>
-            this.state.evaluateCondition(choice.condition)
-        );
+        // Separate choices into available and disabled
+        const availableChoices = [];
+        const disabledChoices = [];
+
+        for (const choice of choices) {
+            if (this.state.evaluateCondition(choice.condition)) {
+                availableChoices.push(choice);
+            } else {
+                disabledChoices.push(choice);
+            }
+        }
 
         if (availableChoices.length === 0) {
             // Dead end
@@ -863,7 +873,7 @@ class DialoguePlayer {
         }
 
         // Check for auto-continue (single choice with no text)
-        if (availableChoices.length === 1 && !availableChoices[0].text) {
+        if (availableChoices.length === 1 && !availableChoices[0].text && disabledChoices.length === 0) {
             await this.delay(500);
             await this.playNode(availableChoices[0].target);
             return;
@@ -879,6 +889,7 @@ class DialoguePlayer {
             scrollArea.scrollTop = scrollArea.scrollHeight;
         }, 50);
 
+        // Render available choices first
         for (let i = 0; i < availableChoices.length; i++) {
             const choice = availableChoices[i];
             const btn = document.createElement('button');
@@ -904,6 +915,27 @@ class DialoguePlayer {
                 choicesArea.classList.add('hidden');
                 await this.playNode(choice.target);
             });
+
+            choicesArea.appendChild(btn);
+        }
+
+        // Render disabled choices (grayed out, not clickable)
+        for (const choice of disabledChoices) {
+            const btn = document.createElement('button');
+            btn.className = 'play-choice-btn disabled';
+            btn.disabled = true;
+
+            const conditionHtml = choice.condition
+                ? `<span class="choice-condition-badge">{${this.escapeHtml(choice.condition)}}</span>`
+                : '';
+
+            if (choice.text) {
+                btn.innerHTML = `<span class="choice-number disabled">✗</span> ${this.escapeHtml(choice.text)} ${conditionHtml}`;
+            } else {
+                btn.innerHTML = `<span class="choice-number disabled">✗</span> <span class="choice-continue">→ ${this.escapeHtml(choice.target)}</span> ${conditionHtml}`;
+            }
+
+            btn.title = `Condition not met: ${choice.condition || 'unknown'}`;
 
             choicesArea.appendChild(btn);
         }

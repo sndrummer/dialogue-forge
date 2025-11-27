@@ -159,8 +159,9 @@ def show_node(file_path, node_id):
         # Show dialogue
         if node.lines:
             click.echo("\n💬 Dialogue:")
-            for speaker, text in node.lines:
-                click.echo(f"  {speaker}: \"{text}\"")
+            for line in node.lines:
+                cond_str = f" {{{line.condition}}}" if line.condition else ""
+                click.echo(f"  {line.speaker}: \"{line.text}\"{cond_str}")
 
         # Show choices
         if node.choices:

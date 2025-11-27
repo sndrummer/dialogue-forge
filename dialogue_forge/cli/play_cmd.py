@@ -331,8 +331,14 @@ class DialoguePlayer:
             if '--debug' in sys.argv:
                 print(f"  {Colors.DIM}*{command}{Colors.RESET}")
 
-        # Display dialogue lines
-        for speaker, text in node.lines:
+        # Display dialogue lines (filter by condition)
+        for line in node.lines:
+            # Only show lines whose conditions are met (or have no condition)
+            if not self.state.evaluate_condition(line.condition, verbose=self.verbose):
+                continue
+
+            speaker = line.speaker
+            text = line.text
             speaker_name = self.dialogue.characters.get(speaker, speaker)
 
             # Format based on speaker type

@@ -865,6 +865,37 @@ body {
     font-style: italic;
 }
 
+/* Disabled choices (condition not met) */
+.play-choice-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--dark-bg);
+    border-color: var(--border-color);
+    border-style: dashed;
+}
+
+.play-choice-btn.disabled:hover {
+    background: var(--dark-bg);
+    border-color: var(--border-color);
+    transform: none;
+}
+
+.choice-number.disabled {
+    background: var(--error-color);
+    opacity: 0.6;
+}
+
+.choice-condition-badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid var(--warning-color);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--warning-color);
+}
+
 /* Modal footer */
 .play-modal-footer {
     padding: 12px 20px;

@@ -301,7 +301,7 @@ def create_app(dialogues_root=None):
                     'choices_count': len(node.choices),
                     'commands_count': len(node.commands),
                     'is_start': node_id == dialogue.start_node,
-                    'lines': [{'speaker': spk, 'text': txt} for spk, txt in node.lines],
+                    'lines': [{'speaker': line.speaker, 'text': line.text, 'condition': line.condition} for line in node.lines],
                     'commands': node.commands
                 }
 
@@ -421,7 +421,14 @@ def create_app(dialogues_root=None):
 
             for node_id, node in dialogue.nodes.items():
                 json_data["nodes"][node_id] = {
-                    "lines": node.lines,
+                    "lines": [
+                        {
+                            "speaker": line.speaker,
+                            "text": line.text,
+                            "condition": line.condition
+                        }
+                        for line in node.lines
+                    ],
                     "commands": node.commands,
                     "choices": [
                         {
