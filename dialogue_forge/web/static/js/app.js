@@ -496,9 +496,23 @@ class DialoguePlayer {
         }
         // Add new variable
         html += `<div class="edit-state-add">
-            <input type="text" class="new-var-name" placeholder="new_variable">
-            <input type="text" class="new-var-value" placeholder="value">
-            <button class="btn btn-sm add-variable-btn">+</button>
+            <div class="edit-state-add-row">
+                <input type="text" class="new-var-name" placeholder="variable_name">
+                <select class="new-var-type">
+                    <option value="bool">Bool</option>
+                    <option value="number">Number</option>
+                    <option value="string">String</option>
+                </select>
+            </div>
+            <div class="edit-state-add-row">
+                <span class="bool-toggle new-var-bool-value">
+                    <input type="checkbox" id="new-var-bool-checkbox">
+                    <label for="new-var-bool-checkbox">false</label>
+                </span>
+                <input type="number" class="new-var-number-value hidden" placeholder="0" value="0">
+                <input type="text" class="new-var-string-value hidden" placeholder="value">
+                <button class="btn btn-sm btn-success add-variable-btn">+ Add</button>
+            </div>
         </div>`;
         html += '</div>';
         html += '</div>';
@@ -549,19 +563,45 @@ class DialoguePlayer {
 
         content.innerHTML = html;
 
+        // Add event listeners for type selector
+        const typeSelect = content.querySelector('.new-var-type');
+        const boolValue = content.querySelector('.new-var-bool-value');
+        const numberValue = content.querySelector('.new-var-number-value');
+        const stringValue = content.querySelector('.new-var-string-value');
+        const boolCheckbox = content.querySelector('#new-var-bool-checkbox');
+        const boolLabel = content.querySelector('.new-var-bool-value label');
+
+        typeSelect?.addEventListener('change', () => {
+            const type = typeSelect.value;
+            boolValue.classList.toggle('hidden', type !== 'bool');
+            numberValue.classList.toggle('hidden', type !== 'number');
+            stringValue.classList.toggle('hidden', type !== 'string');
+        });
+
+        // Update bool label when checkbox changes
+        boolCheckbox?.addEventListener('change', () => {
+            boolLabel.textContent = boolCheckbox.checked ? 'true' : 'false';
+        });
+
         // Add event listeners for add buttons
         content.querySelector('.add-variable-btn')?.addEventListener('click', () => {
             const nameInput = content.querySelector('.new-var-name');
-            const valueInput = content.querySelector('.new-var-value');
-            if (nameInput.value.trim()) {
-                let val = valueInput.value.trim();
-                // Try to parse as number or boolean
-                if (val.toLowerCase() === 'true') val = true;
-                else if (val.toLowerCase() === 'false') val = false;
-                else if (!isNaN(val) && val !== '') val = parseInt(val, 10);
-                this.state.variables[nameInput.value.trim()] = val;
-                this.updateEditStatePanel();
+            const type = typeSelect.value;
+            const name = nameInput.value.trim();
+
+            if (!name) return;
+
+            let val;
+            if (type === 'bool') {
+                val = boolCheckbox.checked;
+            } else if (type === 'number') {
+                val = parseInt(numberValue.value, 10) || 0;
+            } else {
+                val = stringValue.value;
             }
+
+            this.state.variables[name] = val;
+            this.updateEditStatePanel();
         });
 
         content.querySelector('.add-item-btn')?.addEventListener('click', () => {

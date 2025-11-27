@@ -652,9 +652,9 @@ body {
 .play-modal-container {
     position: relative;
     width: 90%;
-    max-width: 800px;
-    height: 80%;
-    max-height: 700px;
+    max-width: 950px;
+    height: 85%;
+    max-height: 850px;
     background: var(--darker-bg);
     border-radius: 16px;
     border: 1px solid var(--border-color);
@@ -814,7 +814,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 200px;
+    max-height: 280px;
     overflow-y: auto;
 }
 
@@ -1346,14 +1346,23 @@ body {
 
 .edit-state-add {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid var(--border-color);
 }
 
-.edit-state-add input {
+.edit-state-add-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.edit-state-add input[type="text"],
+.edit-state-add input[type="number"] {
     flex: 1;
+    min-width: 0;
     padding: 6px 10px;
     background: var(--dark-bg);
     border: 1px solid var(--border-color);
@@ -1362,9 +1371,46 @@ body {
     font-size: 13px;
 }
 
+.edit-state-add input[type="text"]:focus,
+.edit-state-add input[type="number"]:focus,
+.edit-state-add select:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -1px;
+}
+
+.edit-state-add select {
+    padding: 6px 8px;
+    background: var(--dark-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 70px;
+}
+
+.edit-state-add .bool-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--dark-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.edit-state-add .bool-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 .edit-state-add button {
     padding: 6px 12px;
     font-size: 14px;
+    flex-shrink: 0;
 }
 
 /* State Import/Export - now inside unified panel */
