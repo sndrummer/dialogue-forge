@@ -1187,7 +1187,7 @@ class DialogueForgeApp {
             mode: 'text/plain',
             theme: 'monokai',
             lineNumbers: true,
-            lineWrapping: false,
+            lineWrapping: true,
             autofocus: true,
             indentUnit: 2,
             tabSize: 2,
@@ -1312,10 +1312,28 @@ class DialogueForgeApp {
     }
 
     setupDLGSyntaxHighlighting() {
-        // Custom overlay mode for .dlg syntax
+        // Custom mode for .dlg syntax with multi-line string support
         CodeMirror.defineMode('dlg', function() {
             return {
-                token: function(stream) {
+                startState: function() {
+                    return { inString: false };
+                },
+                token: function(stream, state) {
+                    // If we're inside a multi-line string, continue until closing quote
+                    if (state.inString) {
+                        while (!stream.eol()) {
+                            const ch = stream.next();
+                            if (ch === '"') {
+                                state.inString = false;
+                                return 'string';
+                            }
+                            if (ch === '\\') {
+                                stream.next(); // Skip escaped char
+                            }
+                        }
+                        return 'string'; // Still in string, continue on next line
+                    }
+
                     // Comments
                     if (stream.match(/^#.*/)) {
                         return 'comment';
@@ -1341,9 +1359,26 @@ class DialogueForgeApp {
                         return 'string-2';
                     }
 
-                    // String literals
+                    // String literals - check for single-line first
                     if (stream.match(/^"([^"\\]|\\.)*"/)) {
                         return 'string';
+                    }
+
+                    // Opening quote for multi-line string
+                    if (stream.match(/^"/)) {
+                        state.inString = true;
+                        // Consume rest of line
+                        while (!stream.eol()) {
+                            const ch = stream.next();
+                            if (ch === '"') {
+                                state.inString = false;
+                                return 'string';
+                            }
+                            if (ch === '\\') {
+                                stream.next(); // Skip escaped char
+                            }
+                        }
+                        return 'string'; // String continues to next line
                     }
 
                     // Action brackets
@@ -2571,11 +2606,13 @@ Example DLG:
             const containerRect = document.querySelector('.content').getBoundingClientRect();
             const leftWidth = e.clientX - containerRect.left;
             const totalWidth = containerRect.width;
+            const resizerWidth = 4; // Match CSS .resizer width
             const leftPercent = (leftWidth / totalWidth) * 100;
 
             if (leftPercent > 20 && leftPercent < 80) {
-                leftPanel.style.flex = `0 0 ${leftPercent}%`;
-                rightPanel.style.flex = `0 0 ${100 - leftPercent}%`;
+                // Use calc() to account for resizer width (subtract 2px from each panel)
+                leftPanel.style.flex = `0 0 calc(${leftPercent}% - ${resizerWidth / 2}px)`;
+                rightPanel.style.flex = `0 0 calc(${100 - leftPercent}% - ${resizerWidth / 2}px)`;
 
                 // Refresh CodeMirror
                 this.editor.refresh();

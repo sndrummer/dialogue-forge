@@ -246,6 +246,7 @@ body {
 
 /* Resizer */
 .resizer {
+    flex: 0 0 4px;
     width: 4px;
     background: var(--border-color);
     cursor: col-resize;

@@ -187,6 +187,7 @@
                         <tr><td><code>[state]</code></td><td>Initialize game state for scene</td></tr>
                         <tr><td><code>[node_name]</code></td><td>Define a dialogue node</td></tr>
                         <tr><td><code>speaker: "text"</code></td><td>Dialogue line</td></tr>
+                        <tr><td><code>speaker: "long<br>  text"</code></td><td>Multi-line (unclosed quote)</td></tr>
                         <tr><td><code>-> target: "text"</code></td><td>Choice with text</td></tr>
                         <tr><td><code>-> target</code></td><td>Auto-continue</td></tr>
                         <tr><td><code>-> END</code></td><td>End conversation</td></tr>
@@ -263,6 +264,20 @@ npc: "Welcome, traveler!"
 hero: "I'm looking for adventure!"
 narrator: "The wind howls outside."</code></pre>
                     <p class="guide-tip">💡 <strong>narrator</strong> is special — it shows as italic scene description.</p>
+                </section>
+
+                <!-- Multi-line Dialogue -->
+                <section class="guide-section">
+                    <h3>Multi-line Dialogue</h3>
+                    <p>For long dialogue, split across multiple lines by leaving the quote open:</p>
+                    <pre><code>elder: "Welcome to our village, traveler.
+    We have been expecting you for some
+    time now. Please, make yourself
+    at home."</code></pre>
+                    <p>The lines are joined with spaces. You can also add a condition at the end:</p>
+                    <pre><code>elder: "I see you've brought the sacred
+    artifact. This changes everything." {has_item:artifact}</code></pre>
+                    <p class="guide-tip">💡 Indent continuation lines for readability. Empty lines and comments within multi-line text are skipped.</p>
                 </section>
 
                 <!-- Choices -->

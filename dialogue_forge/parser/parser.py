@@ -182,6 +182,58 @@ class DialogueParser:
         matches = sum(1 for c1, c2 in zip(s1.lower(), s2.lower()) if c1 == c2)
         return matches / max(len(s1), len(s2))
 
+    def _read_multiline_quoted_text(self, lines: List[str], start_index: int, initial_text: str) -> Tuple[str, Optional[str], int]:
+        """
+        Read multi-line quoted text when a quote is opened but not closed on the same line.
+
+        Returns:
+            Tuple of (text, condition, next_line_index)
+        """
+        text_parts = [initial_text]
+        i = start_index
+
+        while i < len(lines):
+            line = lines[i].rstrip()
+            stripped = line.strip()
+
+            # Skip empty lines and comments within multi-line text
+            if not stripped or stripped.startswith('#'):
+                i += 1
+                continue
+
+            # Check if this line closes the quote
+            if '"' in stripped:
+                # Find the closing quote
+                quote_pos = stripped.find('"')
+                before_quote = stripped[:quote_pos].strip()
+                after_quote = stripped[quote_pos + 1:].strip()
+
+                # Add the text before the closing quote
+                if before_quote:
+                    text_parts.append(before_quote)
+
+                # Check for condition after the closing quote
+                condition = None
+                if after_quote.startswith('{') and after_quote.endswith('}'):
+                    condition = after_quote[1:-1].strip()
+                elif '{' in after_quote:
+                    cond_start = after_quote.find('{')
+                    cond_end = after_quote.rfind('}')
+                    if cond_end > cond_start:
+                        condition = after_quote[cond_start + 1:cond_end].strip()
+
+                # Join all parts with a single space
+                final_text = ' '.join(text_parts)
+                return final_text, condition, i + 1
+            else:
+                # No closing quote - this is a continuation line
+                text_parts.append(stripped)
+                i += 1
+
+        # Reached end of file without closing quote - return what we have
+        final_text = ' '.join(text_parts)
+        return final_text, None, i
+
     def parse_file(self, file_path: Path) -> Dialogue:
         """Parse a .dlg file and return dialogue structure"""
         if not file_path.exists():
@@ -340,7 +392,28 @@ class DialogueParser:
                 speaker, rest = stripped.split(':', 1)
                 rest = rest.strip()
 
-                # Extract condition if present (at the end after quoted text)
+                # Check for multi-line quoted text (quote opened but not closed)
+                if rest.startswith('"') and rest.count('"') == 1:
+                    # Multi-line: quote opened but not closed on this line
+                    initial_text = rest[1:].strip()  # Remove opening quote
+                    text, condition, next_i = self._read_multiline_quoted_text(lines, i + 1, initial_text)
+
+                    # Validate condition syntax if present
+                    if condition:
+                        condition_warnings = self.validate_condition_syntax(condition, i + 1)
+                        self.dialogue.warnings.extend(condition_warnings)
+
+                    dialogue_line = DialogueLine(
+                        speaker=speaker.strip(),
+                        text=text,
+                        condition=condition,
+                        line_number=i + 1
+                    )
+                    primary_node.lines.append(dialogue_line)
+                    i = next_i
+                    continue
+
+                # Single-line: extract condition if present (at the end after quoted text)
                 condition = None
                 text = rest
 
@@ -399,8 +472,9 @@ class DialogueParser:
         return i
 
     def _parse_choice(self, lines: List[str], start_index: int, node: DialogueNode) -> int:
-        """Parse a choice line"""
+        """Parse a choice line, returns the next line index to process"""
         line = lines[start_index].strip()
+        next_index = start_index + 1
 
         # Remove -> prefix
         choice_text = line[2:].strip()
@@ -411,7 +485,27 @@ class DialogueParser:
             target = target.strip()
             rest = rest.strip()
 
-            # Check for condition
+            # Check for multi-line quoted text (quote opened but not closed)
+            if rest.startswith('"') and rest.count('"') == 1:
+                # Multi-line: quote opened but not closed on this line
+                initial_text = rest[1:].strip()  # Remove opening quote
+                text, condition, next_index = self._read_multiline_quoted_text(lines, start_index + 1, initial_text)
+
+                # Validate condition syntax if present
+                if condition:
+                    condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
+                    self.dialogue.warnings.extend(condition_warnings)
+
+                choice = Choice(
+                    target=target,
+                    text=text,
+                    condition=condition,
+                    line_number=start_index + 1
+                )
+                node.choices.append(choice)
+                return next_index
+
+            # Single-line: check for condition
             condition = None
             text = rest
 
@@ -460,7 +554,7 @@ class DialogueParser:
             )
 
         node.choices.append(choice)
-        return start_index + 1
+        return next_index
 
     def validate(self) -> bool:
         """Validate the parsed dialogue"""
