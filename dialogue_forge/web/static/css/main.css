@@ -1680,6 +1680,56 @@ body {
     margin-bottom: 12px;
 }
 
+/* CodeMirror Search Dialog Styling */
+.CodeMirror-dialog {
+    background: var(--dark-bg);
+    border-top: 1px solid var(--border-color);
+    padding: 8px 12px;
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.CodeMirror-dialog input {
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text-color);
+    font-size: 14px;
+    font-family: inherit;
+    margin-left: 8px;
+}
+
+.CodeMirror-dialog input:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -1px;
+}
+
+.CodeMirror-dialog button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.CodeMirror-dialog button:hover {
+    background: #4f46e5;
+}
+
+/* Search match highlighting */
+.cm-searching {
+    background-color: rgba(255, 255, 0, 0.4) !important;
+}
+
+.CodeMirror-search-match {
+    background-color: rgba(255, 255, 0, 0.3);
+    border-bottom: 1px solid #f59e0b;
+}
+
 /* Utility classes */
 .hidden {
     display: none !important;

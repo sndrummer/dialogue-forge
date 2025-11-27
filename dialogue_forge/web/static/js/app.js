@@ -1127,7 +1127,25 @@ class DialogueForgeApp {
                 'Ctrl-R': () => this.handleReload(),
                 'Cmd-R': () => this.handleReload(),
                 'Ctrl-Enter': () => this.validateDialogue(),
-                'Cmd-Enter': () => this.validateDialogue()
+                'Cmd-Enter': () => this.validateDialogue(),
+                // Search: use persistent dialog (stays open on Enter)
+                'Ctrl-F': 'findPersistent',
+                'Cmd-F': 'findPersistent',
+                // Find next/previous
+                'Ctrl-G': 'findNext',
+                'Cmd-G': 'findNext',
+                'Ctrl-Shift-G': 'findPrev',
+                'Cmd-Shift-G': 'findPrev',
+                'F3': 'findNext',
+                'Shift-F3': 'findPrev',
+                // Escape clears search highlighting
+                'Esc': (cm) => {
+                    if (cm.state.search && cm.state.search.query) {
+                        cm.execCommand('clearSearch');
+                    }
+                    // Also exit any other mode (like multi-cursor)
+                    return CodeMirror.Pass;
+                }
             }
         });
 
