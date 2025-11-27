@@ -87,12 +87,20 @@ class DialogueValidator:
         current_stacked_nodes = []  # Track consecutive node labels
         node_line = 0
         bracket_stack = []
+        self._in_multiline_string = False  # Track multi-line dialogue strings
 
         for line_num, line in enumerate(self.lines, 1):
             stripped = line.strip()
 
             # Skip empty lines and comments
             if not stripped or stripped.startswith('#'):
+                continue
+
+            # Handle multi-line string continuation
+            if self._in_multiline_string:
+                # Check if this line closes the string
+                if '"' in stripped:
+                    self._in_multiline_string = False
                 continue
 
             # Check for characters section
@@ -177,6 +185,15 @@ class DialogueValidator:
                     # Validate dialogue text has quotes
                     dialogue_part = stripped[stripped.index(':') + 1:].strip()
 
+                    # Check for multi-line string (starts with quote but doesn't end with one)
+                    if dialogue_part.startswith('"') and dialogue_part.count('"') == 1:
+                        # This is the start of a multi-line string - valid, skip further validation
+                        self._in_multiline_string = True
+                        # Check if speaker is defined
+                        if speaker not in self.characters:
+                            self._add_warning(line_num, 1, f"Speaker '{speaker}' not defined in [characters] section")
+                        continue
+
                     # Check if this has a condition at the end
                     has_condition = False
                     if dialogue_part and '{' in dialogue_part:
@@ -244,7 +261,9 @@ class DialogueValidator:
                 # Find the closing quote
                 quote_count = rest.count('"')
                 if quote_count < 2:
-                    self._add_error(line_num, line.index(rest) + 1, "Unclosed quote in choice text")
+                    # This is the start of a multi-line string - valid
+                    self._in_multiline_string = True
+                    return
 
             elif rest.startswith('['):
                 # Find the closing bracket

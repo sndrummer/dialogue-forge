@@ -21,8 +21,11 @@ elder: "I am the village elder. How may I help you?"
 [ask_about_village]
 *set talked_to_elder = true
 *add reputation = 5
-elder: "This is a peaceful farming village."
-elder: "We've been here for generations."
+# Multi-line dialogue example: leave the quote open to continue on the next line.
+# Indent continuation lines for readability - whitespace is normalized automatically.
+elder: "This is a peaceful farming village nestled in the valley. We've been
+    here for generations, tending the land and living simple lives. The
+    mountains protect us from the harsh northern winds."
 elder: "Feel free to look around!"
 -> ask_about_shop: "Where's the shop?"
 -> END: "Thank you. Farewell."
