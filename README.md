@@ -19,7 +19,7 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/dialogue-forge.git
+git clone https://github.com/sndrummer/dialogue-forge.git
 cd dialogue-forge
 
 # Install dependencies

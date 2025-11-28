@@ -8,7 +8,7 @@ This is the **Dialogue Forge** tooling suite for the custom `.dlg` dialogue form
 
 ## Key Commands
 
-All commands should be run from the `tools/dialogue` directory.
+All commands should be run from the project root directory.
 
 ### Setup
 ```bash
@@ -52,6 +52,21 @@ uv run dlg stats <file.dlg>     # Show statistics
 uv run dlg show-node <file.dlg> <node_name>  # Display specific node
 ```
 
+### Makefile (Shortcuts)
+A Makefile is provided for convenience:
+```bash
+make help                    # Show all available commands
+make web                     # Start web editor (port 5000)
+make web port=8080           # Custom port
+make play file=example.dlg   # Play a dialogue
+make validate file=example.dlg  # Validate a file
+make export file=example.dlg    # Export to JSON
+make test                    # Run pytest
+make lint                    # Run ruff linter
+make format                  # Format code with ruff
+make sync                    # Install dependencies
+```
+
 ## Architecture
 
 ### Package Structure
@@ -78,24 +93,38 @@ dialogue_forge/
 
 ### Data Model
 
+All dataclasses are defined in `parser/parser.py`:
+
 ```python
 Dialogue
 ├── characters: Dict[str, str]  # id -> display name
 ├── nodes: Dict[str, DialogueNode]
-├── start_node: str
-└── errors/warnings: List[str]
+├── start_node: Optional[str]
+├── initial_state: List[str]    # Commands from [state] section
+├── errors: List[str]
+└── warnings: List[str]
 
 DialogueNode
 ├── id: str
-├── lines: List[Tuple[str, str]]  # (speaker, text)
+├── lines: List[DialogueLine]
 ├── choices: List[Choice]
-└── commands: List[str]
+├── commands: List[str]
+└── line_number: int
+
+DialogueLine
+├── speaker: str
+├── text: str
+├── condition: Optional[str]
+└── line_number: int
 
 Choice
 ├── target: str
 ├── text: str
-└── condition: Optional[str]
+├── condition: Optional[str]
+└── line_number: int
 ```
+
+Note: `parser/node.py` contains legacy dataclasses that are not currently used.
 
 ## DLG Format Specifics
 
@@ -146,9 +175,18 @@ The web editor (`web/app.py`) provides:
 - Live validation and preview (debounced 1 second)
 - Multiple graph layouts (dagre, breadthfirst, cose, circle)
 - Node/edge inspector panel
+- Save/reload files (Ctrl+S to save)
 - JSON export download
 
-**Current Limitation**: Save functionality is NOT yet implemented. The Ctrl+S shortcut is bound but shows "Save not yet implemented". Changes are held in memory only until you reload the page or navigate away.
+### Playback Features
+- **Interactive playback** - Test dialogues with full state tracking
+- **Path visualization** - Visited nodes highlighted green, current node amber
+- **"Play from here"** - Right-click any node to start from there with computed state:
+  - Shortest path (BFS)
+  - Random path (randomized DFS)
+  - Exploratory path (prefers longer/interesting routes)
+- **"Resume from history"** - Right-click a previously visited node to replay your exact path
+- **State management** - View, edit, import/export game state during playback
 
 ## Development Workflow
 
