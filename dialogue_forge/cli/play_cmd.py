@@ -641,9 +641,9 @@ class DialoguePlayer:
 
 def select_dialogue_file():
     """Interactive dialogue file selection"""
-    # Look for dialogues in the resources folder relative to the tools directory
-    tools_dir = Path(__file__).parent.parent.parent
-    dialogues_dir = tools_dir.parent.parent / "resources" / "dialogue"
+    # Look for dialogues in the resources folder relative to repo root
+    repo_root = Path(__file__).parent.parent.parent
+    dialogues_dir = repo_root / "resources" / "dialogue"
 
     if not dialogues_dir.exists():
         print(f"{Colors.RED}❌ No dialogues directory found at {dialogues_dir}!{Colors.RESET}")
