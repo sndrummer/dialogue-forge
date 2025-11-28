@@ -4,6 +4,7 @@
 hero: Test Hero
 npc: Test NPC
 merchant: Merchant
+narrator: Narrator
 
 [start]
 narrator: "Testing all dialogue features..."
@@ -45,6 +46,7 @@ narrator: "All condition types tested"
 -> test_choices
 
 [test_choices]
+*set with_condition = true
 merchant: "Test choice types..."
 -> spoken_choice: "Spoken dialogue choice"
 -> action_choice: [Action in brackets]

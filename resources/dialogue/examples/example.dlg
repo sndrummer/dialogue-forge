@@ -41,6 +41,7 @@ merchant: "Welcome! What can I get for you?"
 -> buy_potion: "Health potion (20 gold)" {gold >= 20}
 -> buy_sword: "Steel sword (50 gold)" {gold >= 50}
 -> haggle: "Can you give me a discount?" {talked_to_elder}
+-> leaving_village: "I'm done shopping. Time to leave."
 -> END: "Just browsing."
 
 [buy_potion]

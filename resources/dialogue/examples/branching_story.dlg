@@ -51,8 +51,8 @@ hero: "There's a window around back..."
 [enter_castle]
 hero: "The castle is grand but eerily quiet."
 -> throne_room: "Head to the throne room"
--> dungeon: "Explore the dungeon" {!has_permission}
--> dungeon_risky: "Sneak to the dungeon" {has_permission}
+-> dungeon: "Explore the dungeon" {has_permission}
+-> dungeon_risky: "Sneak to the dungeon" {!has_permission}
 
 [dungeon_risky]
 hero: "I shouldn't push my luck... but I'm curious."
@@ -77,13 +77,14 @@ prisoner: "Please... reconsider..."
 -> throne_room
 
 [report_prisoner]
+*set reported_prisoner = true
 hero: "The King might reward me for this information."
 -> throne_room
 
 [throne_room]
 king: "Who dares enter my throne room?"
 -> confront_truth: "Your prisoner told me the truth!" {freed_prisoner}
--> bow: "Your Majesty, I come with information." {report_prisoner}
+-> bow: "Your Majesty, I come with information." {reported_prisoner}
 -> plea: "I seek an audience, Your Highness."
 
 [confront_truth]
