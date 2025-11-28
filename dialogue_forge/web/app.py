@@ -696,6 +696,69 @@ def create_app(dialogues_root=None):
                 'traceback': traceback.format_exc()
             }), 500
 
+    @app.route('/api/replay-path', methods=['POST'])
+    def replay_path():
+        """
+        Replay an exact path through the dialogue, reconstructing the game state
+        at the final node. Used for "Resume from history" feature.
+
+        Unlike compute-path which finds a path, this takes a known path and
+        simulates walking through it to reconstruct the exact state.
+        """
+        data = request.json
+        content = data.get('content', '')
+        path = data.get('path', [])
+
+        if not path:
+            return jsonify({'error': 'No path specified'}), 400
+
+        parser = DialogueParser()
+
+        try:
+            lines = content.split('\n')
+            dialogue = parser.parse_lines(lines)
+
+            # Initialize state and execute [state] section commands
+            state = WebGameState()
+            for cmd in dialogue.initial_state:
+                state.execute_command(cmd)
+
+            # Walk through the path, executing commands at each node
+            for i, node_id in enumerate(path):
+                if node_id not in dialogue.nodes:
+                    # Skip unknown nodes (might be END or similar)
+                    continue
+
+                node = dialogue.nodes[node_id]
+
+                # Execute commands at this node
+                for cmd in node.commands:
+                    state.execute_command(cmd)
+
+                # If there's a next node in the path, find which choice leads there
+                # and see if it has any state-affecting side effects
+                if i < len(path) - 1:
+                    next_node_id = path[i + 1]
+                    for choice in node.choices:
+                        if choice.target == next_node_id:
+                            # Found the choice that was taken
+                            # (Choice conditions don't affect state, just gate access)
+                            break
+
+            return jsonify({
+                'success': True,
+                'path': path,
+                'path_length': len(path),
+                'state': state.to_dict()
+            })
+
+        except Exception as e:
+            import traceback
+            return jsonify({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }), 500
+
     @app.route('/api/new-file', methods=['POST'])
     def create_new_file():
         """Create a new dialogue file with template content"""

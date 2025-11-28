@@ -290,6 +290,48 @@ class DialoguePlayer {
         }
     }
 
+    async playFromHistory(nodeId, fullPath) {
+        // Replay the exact path from last play session up to and including the target node
+        const content = this.app.editor.getValue();
+
+        // Find the target node in the path and slice up to it
+        const targetIndex = fullPath.indexOf(nodeId);
+        if (targetIndex === -1) {
+            this.app.showNotification('Node not found in play history', 'error');
+            return;
+        }
+
+        // Get the path up to and including the target node
+        const pathToReplay = fullPath.slice(0, targetIndex + 1);
+
+        try {
+            const response = await fetch('/api/replay-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, path: pathToReplay })
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                this.app.showNotification('Error replaying path: ' + data.error, 'error');
+                return;
+            }
+
+            this.app.showNotification(`Resumed at node ${targetIndex + 1} of ${fullPath.length} from history`, 'success');
+
+            // Initialize visited path with the replayed path
+            this.visitedPath = [...pathToReplay];
+            this.app.highlightPath(this.visitedPath, nodeId);
+
+            // Play from the target node with replayed state
+            await this.play(nodeId, data.state, true); // true = skip path reset
+
+        } catch (error) {
+            console.error('Play from history error:', error);
+            this.app.showNotification('Failed to replay path: ' + error.message, 'error');
+        }
+    }
+
     showModal() {
         // Create the play modal
         this.modal = document.createElement('div');
@@ -401,6 +443,10 @@ class DialoguePlayer {
 
     close() {
         this.isPlaying = false;
+        // Preserve the visited path for "Resume from history" feature
+        if (this.visitedPath.length > 0) {
+            this.app.lastPlayedPath = [...this.visitedPath];
+        }
         if (this.modal) {
             this.modal.remove();
             this.modal = null;
@@ -1098,6 +1144,7 @@ class DialogueForgeApp {
         this.vimMode = false;
         this.dialoguePlayer = null;
         this.contextMenu = null;
+        this.lastPlayedPath = []; // Preserve path from last play session for "Resume" feature
 
         this.init();
     }
@@ -1149,6 +1196,9 @@ class DialogueForgeApp {
             <div class="context-menu-item" data-action="play-explore">
                 <span>🗺️</span> Play (explore path)
             </div>
+            <div class="context-menu-item context-menu-history hidden" data-action="play-history">
+                <span>🔄</span> Resume from history
+            </div>
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="edit">
                 <span>✏️</span> Edit in editor
@@ -1180,6 +1230,8 @@ class DialogueForgeApp {
                 this.dialoguePlayer.playFromNode(nodeId, 'random');
             } else if (action === 'play-explore' && nodeId) {
                 this.dialoguePlayer.playFromNode(nodeId, 'explore');
+            } else if (action === 'play-history' && nodeId) {
+                this.dialoguePlayer.playFromHistory(nodeId, this.lastPlayedPath);
             } else if (action === 'inspect' && nodeId) {
                 const node = this.cy.getElementById(nodeId);
                 if (node) {
@@ -1572,6 +1624,14 @@ class DialogueForgeApp {
 
             // Don't show context menu for END node
             if (nodeId === 'END') return;
+
+            // Show/hide "Resume from history" option based on whether node was visited
+            const historyItem = this.contextMenu.querySelector('.context-menu-history');
+            if (this.lastPlayedPath.includes(nodeId)) {
+                historyItem.classList.remove('hidden');
+            } else {
+                historyItem.classList.add('hidden');
+            }
 
             // Position and show context menu
             const pos = evt.originalEvent;
