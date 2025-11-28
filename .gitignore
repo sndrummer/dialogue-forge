@@ -51,6 +51,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# VSCode extension build artifacts
+*.vsix
+
 # Local settings
 .claude/settings.local.json
 *.local.json

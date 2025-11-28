@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DLG",
+  "scopeName": "source.dlg",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#special-node" },
+    { "include": "#node" },
+    { "include": "#command" },
+    { "include": "#choice" },
+    { "include": "#speaker-line" },
+    { "include": "#end-keyword" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.dlg",
+      "match": "^\\s*#.*$"
+    },
+    "special-node": {
+      "name": "keyword.control.section.dlg",
+      "match": "^\\s*\\[(start|characters|state)\\]"
+    },
+    "node": {
+      "name": "entity.name.section.dlg",
+      "match": "^\\s*\\[[^\\]]+\\]"
+    },
+    "command": {
+      "begin": "^\\s*(\\*)(\\w+)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.dlg" },
+        "2": { "name": "keyword.other.command.dlg" }
+      },
+      "end": "$",
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#operator" },
+        {
+          "name": "variable.other.dlg",
+          "match": "\\b\\w+\\b"
+        }
+      ]
+    },
+    "choice": {
+      "begin": "^\\s*(->)\\s*",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.choice.dlg" }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "name": "keyword.control.end.dlg",
+          "match": "\\bEND\\b"
+        },
+        {
+          "name": "entity.name.function.target.dlg",
+          "match": "\\b\\w+\\b(?=\\s*:)"
+        },
+        {
+          "name": "entity.name.function.goto.dlg",
+          "match": "\\b\\w+\\b(?=\\s*(?:\\{|$))"
+        },
+        { "include": "#string" },
+        { "include": "#condition" }
+      ]
+    },
+    "speaker-line": {
+      "begin": "^\\s*(\\w+)(:)",
+      "beginCaptures": {
+        "1": { "name": "entity.name.tag.speaker.dlg" },
+        "2": { "name": "punctuation.separator.dlg" }
+      },
+      "end": "$",
+      "patterns": [
+        { "include": "#string" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.dlg",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.dlg",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "condition": {
+      "name": "meta.condition.dlg",
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.condition.begin.dlg" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.condition.end.dlg" }
+      },
+      "patterns": [
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#operator" },
+        { "include": "#condition-keyword" },
+        {
+          "name": "variable.other.condition.dlg",
+          "match": "\\b\\w+\\b"
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.dlg",
+      "match": "-?\\b\\d+\\b"
+    },
+    "boolean": {
+      "name": "constant.language.boolean.dlg",
+      "match": "\\b(true|false)\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.dlg",
+      "match": "(==|!=|>=|<=|&&|\\|\\||[=<>!&|+\\-])"
+    },
+    "condition-keyword": {
+      "name": "keyword.other.condition.dlg",
+      "match": "\\b(has_item|companion)\\b"
+    },
+    "end-keyword": {
+      "name": "keyword.control.end.dlg",
+      "match": "\\bEND\\b"
+    }
+  }
+}

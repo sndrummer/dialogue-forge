@@ -1,0 +1,42 @@
+{
+  "name": "dlg-language",
+  "displayName": "DLG Language (Dialogue Forge)",
+  "description": "Syntax highlighting for .dlg dialogue files used by Dialogue Forge",
+  "version": "1.0.0",
+  "publisher": "sndrummer",
+  "author": {
+    "name": "Samuel Nuttall"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sndrummer/dialogue-forge"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "dlg",
+        "aliases": [
+          "DLG",
+          "Dialogue Forge"
+        ],
+        "extensions": [
+          ".dlg"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "dlg",
+        "scopeName": "source.dlg",
+        "path": "./syntaxes/dlg.tmLanguage.json"
+      }
+    ]
+  }
+}
