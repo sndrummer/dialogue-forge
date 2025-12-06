@@ -73,7 +73,30 @@
       },
       "end": "$",
       "patterns": [
-        { "include": "#string" }
+        { "include": "#string" },
+        { "include": "#tag" },
+        { "include": "#condition" }
+      ]
+    },
+    "tag": {
+      "name": "meta.tag.dlg",
+      "begin": "\\[(?!\\w+\\]\\s*$)",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": { "name": "punctuation.bracket.tag.dlg" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.bracket.tag.dlg" }
+      },
+      "patterns": [
+        {
+          "name": "entity.other.attribute-name.dlg",
+          "match": "\\b\\w+\\b"
+        },
+        {
+          "name": "punctuation.separator.tag.dlg",
+          "match": ","
+        }
       ]
     },
     "string": {

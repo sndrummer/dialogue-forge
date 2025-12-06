@@ -872,7 +872,7 @@ class DialoguePlayer {
         for (const line of node.lines) {
             // Only show lines whose conditions are met (or have no condition)
             if (this.state.evaluateCondition(line.condition)) {
-                await this.displayDialogueLine(line.speaker, line.text);
+                await this.displayDialogueLine(line.speaker, line.text, line.tags || []);
             }
         }
 
@@ -880,7 +880,26 @@ class DialoguePlayer {
         await this.showChoices(node.choices);
     }
 
-    async displayDialogueLine(speaker, text) {
+    // Emoji mappings for common emotion tags
+    static EMOTION_EMOJIS = {
+        // Basic emotions
+        happy: '😊', sad: '😢', angry: '😠', surprised: '😮', scared: '😨',
+        excited: '🤩', nervous: '😰', confused: '😕', proud: '😤', shy: '😳',
+        tired: '😴', bored: '😒', disgusted: '🤢', love: '😍', crying: '😭',
+        laughing: '😂', smirk: '😏', worried: '😟', relieved: '😌', grateful: '🙏',
+        determined: '💪', thinking: '🤔', shocked: '😱', calm: '😌', cold: '🥶',
+        embarrassed: '😳', flustered: '😳',
+        // States
+        whispering: '🤫', shouting: '📢', serious: '😐', neutral: '😐',
+        warm: '☀️', welcoming: '👋', curious: '🧐', impressed: '👏',
+        tearful: '🥺', confident: '😎', brave: '🦁', waving: '👋'
+    };
+
+    getEmotionEmoji(tag) {
+        return DialoguePlayer.EMOTION_EMOJIS[tag.toLowerCase()] || null;
+    }
+
+    async displayDialogueLine(speaker, text, tags = []) {
         const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
         const speakerName = this.characters[speaker] || speaker;
 
@@ -889,15 +908,53 @@ class DialoguePlayer {
         box.className = `dialogue-box ${speaker === 'narrator' ? 'narrator' : ''} ${speaker === 'hero' ? 'player' : 'npc'}`;
 
         if (speaker !== 'narrator') {
-            const nameEl = document.createElement('div');
+            // Create header with speaker name and tags
+            const headerEl = document.createElement('div');
+            headerEl.className = 'dialogue-header';
+
+            const nameEl = document.createElement('span');
             nameEl.className = 'dialogue-speaker';
             nameEl.textContent = speakerName;
-            box.appendChild(nameEl);
+            headerEl.appendChild(nameEl);
+
+            // Add tags as colorful badges with emojis
+            if (tags && tags.length > 0) {
+                const tagsEl = document.createElement('span');
+                tagsEl.className = 'dialogue-tags';
+
+                tags.forEach(tag => {
+                    const badge = document.createElement('span');
+                    badge.className = 'tag-badge';
+
+                    const emoji = this.getEmotionEmoji(tag);
+                    if (emoji) {
+                        badge.innerHTML = `${emoji} ${this.escapeHtml(tag)}`;
+                    } else {
+                        badge.textContent = tag;
+                    }
+
+                    // Add color based on emotion category
+                    badge.classList.add(this.getTagColorClass(tag));
+                    tagsEl.appendChild(badge);
+                });
+
+                headerEl.appendChild(tagsEl);
+            }
+
+            box.appendChild(headerEl);
         }
 
         const textEl = document.createElement('div');
         textEl.className = 'dialogue-text';
         box.appendChild(textEl);
+
+        // Always show tags in simple format below text (for clarity)
+        if (tags && tags.length > 0) {
+            const simpleTagsEl = document.createElement('div');
+            simpleTagsEl.className = 'dialogue-tags-simple';
+            simpleTagsEl.textContent = `[${tags.join(', ')}]`;
+            box.appendChild(simpleTagsEl);
+        }
 
         scrollArea.appendChild(box);
         scrollArea.scrollTop = scrollArea.scrollHeight;
@@ -907,6 +964,34 @@ class DialoguePlayer {
 
         // Small pause after each line
         await this.delay(300);
+    }
+
+    getTagColorClass(tag) {
+        const t = tag.toLowerCase();
+        // Positive emotions - green/teal
+        if (['happy', 'excited', 'love', 'grateful', 'proud', 'relieved', 'warm', 'welcoming', 'confident', 'brave'].includes(t)) {
+            return 'tag-positive';
+        }
+        // Negative emotions - red/orange
+        if (['angry', 'sad', 'scared', 'crying', 'disgusted', 'tearful', 'worried'].includes(t)) {
+            return 'tag-negative';
+        }
+        // Surprised/alert - yellow
+        if (['surprised', 'shocked', 'curious', 'impressed'].includes(t)) {
+            return 'tag-alert';
+        }
+        // Neutral/calm - blue/gray
+        if (['calm', 'neutral', 'serious', 'thinking', 'tired', 'bored'].includes(t)) {
+            return 'tag-neutral';
+        }
+        // Action/state - purple
+        return 'tag-action';
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     async typewriter(element, text) {
@@ -1410,7 +1495,7 @@ class DialogueForgeApp {
         CodeMirror.defineMode('dlg', function() {
             return {
                 startState: function() {
-                    return { inString: false };
+                    return { inString: false, afterString: false };
                 },
                 token: function(stream, state) {
                     // If we're inside a multi-line string, continue until closing quote
@@ -1419,6 +1504,7 @@ class DialogueForgeApp {
                             const ch = stream.next();
                             if (ch === '"') {
                                 state.inString = false;
+                                state.afterString = true;
                                 return 'string';
                             }
                             if (ch === '\\') {
@@ -1428,33 +1514,50 @@ class DialogueForgeApp {
                         return 'string'; // Still in string, continue on next line
                     }
 
-                    // Comments
-                    if (stream.match(/^#.*/)) {
+                    // Skip whitespace but track if we just finished a string
+                    if (stream.eatSpace()) {
+                        return null;
+                    }
+
+                    // Comments (only at start of line)
+                    if (stream.sol() && stream.match(/^#.*/)) {
+                        state.afterString = false;
                         return 'comment';
                     }
 
-                    // Node definitions [node_name]
-                    if (stream.match(/^\[.*?\]/)) {
+                    // Node definitions [node_name] - ONLY at start of line
+                    if (stream.sol() && stream.match(/^\[.*?\]/)) {
+                        state.afterString = false;
                         return 'keyword';
+                    }
+
+                    // Tags [tag1, tag2] - brackets AFTER a string (not at start of line)
+                    if (state.afterString && stream.match(/^\[[^\]]*\]/)) {
+                        // Don't reset afterString yet, conditions might follow
+                        return 'tag';
                     }
 
                     // Commands *set, *add, etc.
                     if (stream.match(/^\*\w+/)) {
+                        state.afterString = false;
                         return 'builtin';
                     }
 
                     // Choices ->
                     if (stream.match(/^->/)) {
+                        state.afterString = false;
                         return 'operator';
                     }
 
                     // Conditions {...}
                     if (stream.match(/^\{[^}]*\}/)) {
+                        state.afterString = false;
                         return 'string-2';
                     }
 
                     // String literals - check for single-line first
                     if (stream.match(/^"([^"\\]|\\.)*"/)) {
+                        state.afterString = true;
                         return 'string';
                     }
 
@@ -1466,6 +1569,7 @@ class DialogueForgeApp {
                             const ch = stream.next();
                             if (ch === '"') {
                                 state.inString = false;
+                                state.afterString = true;
                                 return 'string';
                             }
                             if (ch === '\\') {
@@ -1475,11 +1579,8 @@ class DialogueForgeApp {
                         return 'string'; // String continues to next line
                     }
 
-                    // Action brackets
-                    if (stream.match(/^\[[^\]]*\]/)) {
-                        return 'variable-2';
-                    }
-
+                    // Reset afterString for other tokens
+                    state.afterString = false;
                     stream.next();
                     return null;
                 }
@@ -2428,6 +2529,12 @@ Example DLG:
                 html += '<div class="inspector-item">';
                 html += `<div class="inspector-speaker">${this.escapeHtml(line.speaker)}</div>`;
                 html += `<div class="inspector-text">"${this.escapeHtml(line.text)}"</div>`;
+                if (line.tags && line.tags.length > 0) {
+                    html += `<div class="inspector-tags" style="color: #10b981; font-size: 0.85em; margin-top: 2px;">[${this.escapeHtml(line.tags.join(', '))}]</div>`;
+                }
+                if (line.condition) {
+                    html += `<div class="inspector-condition" style="color: #f59e0b; font-size: 0.85em; margin-top: 2px;">{${this.escapeHtml(line.condition)}}</div>`;
+                }
                 html += '</div>';
             });
             html += '</div>';

@@ -9,8 +9,11 @@
 # Comment
 [node_name]                          # Define a node
 speaker: "Dialogue text"             # Speaker line
+speaker: "Text" [happy]              # Line with tag
+speaker: "Text" [sad, crying]        # Multiple tags
+speaker: "Text" [tag] {condition}    # Tags + condition
 -> target: "Choice text"             # Choice
--> target: "Choice" {condition}     # Conditional choice
+-> target: "Choice" {condition}      # Conditional choice
 *set flag = true                     # Set variable
 *add karma = 10                      # Modify number
 -> END                               # End conversation
@@ -89,7 +92,30 @@ peng: "How are you today?"
 - Multiple lines create sequential dialogue
 - Speaker must be defined in `[characters]`
 
-### 4.3 Narrator Lines
+### 4.3 Tags (Metadata)
+```
+[emotional_scene]
+peng: "I finally found you!" [happy, excited]
+hero: "Peng? Is that really you?" [surprised]
+peng: "The journey was hard..." [sad, tired]
+narrator: "A moment of silence passes." [dramatic_pause]
+```
+- Format: `speaker: "text" [tag1, tag2]`
+- Tags appear in square brackets after the quoted text
+- Multiple tags are comma-separated
+- Tags are optional metadata for game integration
+- Common uses:
+  - **Emotions**: `[happy]`, `[sad]`, `[angry]`, `[surprised]`
+  - **Portrait states**: `[mask_on]`, `[wounded]`, `[formal_attire]`
+  - **Animation hints**: `[thinking]`, `[laughing]`, `[crying]`
+  - **Scene directions**: `[dramatic_pause]`, `[whisper]`
+
+Tags can be combined with conditions:
+```
+peng: "I knew I could trust you!" [happy, relieved] {saved_peng}
+```
+
+### 4.4 Narrator Lines
 ```
 [scene_description]
 narrator: "The sun sets over the mountains."

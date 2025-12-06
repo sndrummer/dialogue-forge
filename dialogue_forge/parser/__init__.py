@@ -2,7 +2,7 @@
 Dialogue parser module for .dlg files
 """
 
+from .node import DialogueChoice, DialogueNode
 from .parser import DialogueParser
-from .node import DialogueNode, DialogueChoice
 
 __all__ = ["DialogueParser", "DialogueNode", "DialogueChoice"]

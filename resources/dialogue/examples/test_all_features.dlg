@@ -10,7 +10,22 @@ narrator: Narrator
 narrator: "Testing all dialogue features..."
 *set test_started = true
 *add xp = 10
-hero: "Let's test everything!"
+hero: "Let's test everything!" [excited, determined]
+-> test_tags
+
+# ============================================================
+# Tags Test Section (OPTIONAL feature)
+# Tags are metadata for game integration (e.g., character portraits)
+# ============================================================
+[test_tags]
+# Single tag
+npc: "Hello there!" [happy]
+# Multiple tags
+hero: "I'm ready for anything." [confident, brave]
+# Tags with condition
+npc: "You seem prepared." [impressed] {xp > 5}
+# No tags (optional, so most lines won't have them)
+narrator: "Testing tags complete."
 -> test_commands
 
 [test_commands]

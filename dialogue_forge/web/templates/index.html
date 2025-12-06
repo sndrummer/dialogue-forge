@@ -187,6 +187,7 @@
                         <tr><td><code>[state]</code></td><td>Initialize game state for scene</td></tr>
                         <tr><td><code>[node_name]</code></td><td>Define a dialogue node</td></tr>
                         <tr><td><code>speaker: "text"</code></td><td>Dialogue line</td></tr>
+                        <tr><td><code>speaker: "text" [tag]</code></td><td>Line with tag (optional)</td></tr>
                         <tr><td><code>speaker: "long<br>  text"</code></td><td>Multi-line (unclosed quote)</td></tr>
                         <tr><td><code>-> target: "text"</code></td><td>Player choice</td></tr>
                         <tr><td><code>-> target</code></td><td>Auto-transition (GOTO)</td></tr>
@@ -279,6 +280,28 @@ narrator: "The wind howls outside."</code></pre>
                     <pre><code>elder: "I see you've brought the sacred
     artifact. This changes everything." {has_item:artifact}</code></pre>
                     <p class="guide-tip">💡 Indent continuation lines for readability. Empty lines and comments within multi-line text are skipped.</p>
+                </section>
+
+                <!-- Tags (Optional Metadata) -->
+                <section class="guide-section">
+                    <h3>Tags (Optional)</h3>
+                    <p>Add optional metadata tags in square brackets for game integration:</p>
+                    <pre><code># Emotion tags for character portraits
+peng: "I finally found you!" [happy]
+hero: "Is that really you?" [surprised]
+
+# Multiple tags
+peng: "It was so hard..." [sad, tired]
+
+# Tags with conditions
+peng: "Thank you!" [grateful, tearful] {saved_peng}</code></pre>
+                    <p>Common uses:</p>
+                    <ul style="margin: 8px 0; padding-left: 20px; font-size: 0.9em;">
+                        <li><strong>Emotions:</strong> <code>[happy]</code>, <code>[sad]</code>, <code>[angry]</code></li>
+                        <li><strong>Portrait states:</strong> <code>[mask_on]</code>, <code>[wounded]</code></li>
+                        <li><strong>Scene hints:</strong> <code>[whisper]</code>, <code>[shouting]</code></li>
+                    </ul>
+                    <p class="guide-tip">💡 Tags are optional metadata — your game decides how to use them (e.g., switching character portraits based on emotion).</p>
                 </section>
 
                 <!-- Choices and Transitions -->

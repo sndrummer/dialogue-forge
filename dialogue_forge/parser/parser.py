@@ -3,14 +3,15 @@ Core parser for .dlg dialogue files (DLG Format v1.0)
 """
 
 import re
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
 class Choice:
     """Represents a dialogue choice"""
+
     target: str
     text: str
     condition: Optional[str] = None
@@ -19,16 +20,19 @@ class Choice:
 
 @dataclass
 class DialogueLine:
-    """Represents a single dialogue line with optional condition"""
+    """Represents a single dialogue line with optional condition and tags"""
+
     speaker: str
     text: str
     condition: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
     line_number: int = 0
 
 
 @dataclass
 class DialogueNode:
     """Represents a dialogue node"""
+
     id: str
     lines: List[DialogueLine] = field(default_factory=list)
     choices: List[Choice] = field(default_factory=list)
@@ -39,6 +43,7 @@ class DialogueNode:
 @dataclass
 class Dialogue:
     """Represents a complete dialogue file"""
+
     characters: Dict[str, str] = field(default_factory=dict)  # id -> display name
     nodes: Dict[str, DialogueNode] = field(default_factory=dict)
     start_node: Optional[str] = None
@@ -51,13 +56,50 @@ class DialogueParser:
     """Parser for .dlg dialogue files (DLG Format v1.0)"""
 
     # Valid condition operators and patterns
-    CONDITION_OPERATORS = {'&&', '||', '!', '>', '<', '>=', '<=', '==', '!='}
-    CONDITION_KEYWORDS = {'true', 'false', 'and', 'or', 'not'}
-    SPECIAL_CHECKS = re.compile(r'(has_item|companion):(\w+)')
+    CONDITION_OPERATORS = {"&&", "||", "!", ">", "<", ">=", "<=", "==", "!="}
+    CONDITION_KEYWORDS = {"true", "false", "and", "or", "not"}
+    SPECIAL_CHECKS = re.compile(r"(has_item|companion):(\w+)")
 
     def __init__(self):
         self.dialogue: Dialogue = Dialogue()
         self.current_line_number: int = 0
+
+    def _extract_tags(self, text: str) -> Tuple[str, List[str]]:
+        """
+        Extract tags from text. Tags appear in square brackets after the quoted text.
+        Format: "dialogue text" [tag1, tag2]
+
+        Returns:
+            Tuple of (remaining_text, tags_list)
+        """
+        tags = []
+
+        # Look for [tags] pattern after the last quote (if quotes exist)
+        if "[" not in text:
+            return text, tags
+
+        # Find the tag brackets - they should be after the closing quote
+        if '"' in text:
+            last_quote = text.rindex('"')
+            bracket_start = text.find("[", last_quote)
+            if bracket_start == -1:
+                return text, tags
+        else:
+            bracket_start = text.find("[")
+
+        bracket_end = text.find("]", bracket_start)
+        if bracket_end == -1:
+            return text, tags
+
+        # Extract the tags string
+        tags_str = text[bracket_start + 1 : bracket_end].strip()
+        remaining_text = text[:bracket_start].strip() + text[bracket_end + 1 :].strip()
+
+        # Parse comma-separated tags
+        if tags_str:
+            tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
+
+        return remaining_text.strip(), tags
 
     def validate_condition_syntax(self, condition: str, line_number: int) -> List[str]:
         """
@@ -71,28 +113,28 @@ class DialogueParser:
         condition = condition.strip()
 
         # Check for balanced braces (should already be stripped, but verify)
-        if condition.count('{') != condition.count('}'):
+        if condition.count("{") != condition.count("}"):
             warnings.append(f"Line {line_number}: Unbalanced braces in condition '{condition}'")
 
         # Check for balanced parentheses
-        if condition.count('(') != condition.count(')'):
+        if condition.count("(") != condition.count(")"):
             warnings.append(f"Line {line_number}: Unbalanced parentheses in condition '{condition}'")
 
         # Check for common syntax errors
         # Empty operators
-        if '&&' in condition and re.search(r'&&\s*&&', condition):
+        if "&&" in condition and re.search(r"&&\s*&&", condition):
             warnings.append(f"Line {line_number}: Double && operator in condition")
-        if '||' in condition and re.search(r'\|\|\s*\|\|', condition):
+        if "||" in condition and re.search(r"\|\|\s*\|\|", condition):
             warnings.append(f"Line {line_number}: Double || operator in condition")
 
         # Check for has_item/companion without colon (common mistake)
-        if re.search(r'\bhas_item\s+\w+', condition):
+        if re.search(r"\bhas_item\s+\w+", condition):
             warnings.append(f"Line {line_number}: 'has_item' should use colon syntax: has_item:item_name")
-        if re.search(r'\bcompanion\s+\w+', condition):
+        if re.search(r"\bcompanion\s+\w+", condition):
             warnings.append(f"Line {line_number}: 'companion' should use colon syntax: companion:name")
 
         # Check for invalid comparison operators
-        if re.search(r'[^!<>=]=[^=]', condition):
+        if re.search(r"[^!<>=]=[^=]", condition):
             # Single = that's not part of ==, !=, <=, >=
             warnings.append(f"Line {line_number}: Use '==' for comparison, not '=' in condition")
 
@@ -116,61 +158,84 @@ class DialogueParser:
 
         # Known commands and their expected syntax
         KNOWN_COMMANDS = {
-            'set': {'min_parts': 4, 'requires_equals': True, 'syntax': '*set variable = value'},
-            'add': {'min_parts': 4, 'requires_equals': True, 'syntax': '*add variable = amount'},
-            'sub': {'min_parts': 4, 'requires_equals': True, 'syntax': '*sub variable = amount'},
-            'give_item': {'min_parts': 2, 'requires_equals': False, 'syntax': '*give_item item_name'},
-            'remove_item': {'min_parts': 2, 'requires_equals': False, 'syntax': '*remove_item item_name'},
-            'add_companion': {'min_parts': 2, 'requires_equals': False, 'syntax': '*add_companion companion_name'},
-            'remove_companion': {'min_parts': 2, 'requires_equals': False, 'syntax': '*remove_companion companion_name'},
-            'start_combat': {'min_parts': 2, 'requires_equals': False, 'syntax': '*start_combat combat_id'},
-            'start_conversation': {'min_parts': 2, 'requires_equals': False, 'syntax': '*start_conversation npc_id'},
+            "set": {"min_parts": 4, "requires_equals": True, "syntax": "*set variable = value"},
+            "add": {"min_parts": 4, "requires_equals": True, "syntax": "*add variable = amount"},
+            "sub": {"min_parts": 4, "requires_equals": True, "syntax": "*sub variable = amount"},
+            "give_item": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*give_item item_name",
+            },
+            "remove_item": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*remove_item item_name",
+            },
+            "add_companion": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*add_companion companion_name",
+            },
+            "remove_companion": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*remove_companion companion_name",
+            },
+            "start_combat": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*start_combat combat_id",
+            },
+            "start_conversation": {
+                "min_parts": 2,
+                "requires_equals": False,
+                "syntax": "*start_conversation npc_id",
+            },
         }
 
         if cmd in KNOWN_COMMANDS:
             spec = KNOWN_COMMANDS[cmd]
 
             # Check minimum parts
-            if len(parts) < spec['min_parts']:
-                warnings.append(
-                    f"Line {line_number}: Command '{cmd}' missing arguments. Expected: {spec['syntax']}"
-                )
+            if len(parts) < spec["min_parts"]:
+                warnings.append(f"Line {line_number}: Command '{cmd}' missing arguments. Expected: {spec['syntax']}")
 
             # Check for equals sign if required
-            if spec['requires_equals'] and '=' not in command:
+            if spec["requires_equals"] and "=" not in command:
                 warnings.append(
                     f"Line {line_number}: Command '{cmd}' requires '=' operator. Expected: {spec['syntax']}"
                 )
 
             # For add/sub, verify the value is numeric
-            if cmd in ('add', 'sub') and len(parts) >= 4:
+            if cmd in ("add", "sub") and len(parts) >= 4:
                 try:
                     int(parts[3])
                 except ValueError:
-                    warnings.append(
-                        f"Line {line_number}: Command '{cmd}' requires numeric value, got '{parts[3]}'"
-                    )
+                    warnings.append(f"Line {line_number}: Command '{cmd}' requires numeric value, got '{parts[3]}'")
         else:
             # Unknown command - check for common typos
             TYPO_SUGGESTIONS = {
-                'sett': 'set', 'ad': 'add', 'addd': 'add', 'subb': 'sub',
-                'give': 'give_item', 'remove': 'remove_item',
-                'addcompanion': 'add_companion', 'removecompanion': 'remove_companion',
-                'give_companion': 'add_companion', 'giveitem': 'give_item',
-                'removeitem': 'remove_item', 'startcombat': 'start_combat',
+                "sett": "set",
+                "ad": "add",
+                "addd": "add",
+                "subb": "sub",
+                "give": "give_item",
+                "remove": "remove_item",
+                "addcompanion": "add_companion",
+                "removecompanion": "remove_companion",
+                "give_companion": "add_companion",
+                "giveitem": "give_item",
+                "removeitem": "remove_item",
+                "startcombat": "start_combat",
             }
 
             if cmd in TYPO_SUGGESTIONS:
-                warnings.append(
-                    f"Line {line_number}: Unknown command '{cmd}', did you mean '{TYPO_SUGGESTIONS[cmd]}'?"
-                )
+                warnings.append(f"Line {line_number}: Unknown command '{cmd}', did you mean '{TYPO_SUGGESTIONS[cmd]}'?")
             else:
                 # Check string similarity for other typos
                 for known_cmd in KNOWN_COMMANDS:
                     if self._string_similarity(cmd, known_cmd) > 0.7:
-                        warnings.append(
-                            f"Line {line_number}: Unknown command '{cmd}', did you mean '{known_cmd}'?"
-                        )
+                        warnings.append(f"Line {line_number}: Unknown command '{cmd}', did you mean '{known_cmd}'?")
                         break
 
         return warnings
@@ -182,12 +247,14 @@ class DialogueParser:
         matches = sum(1 for c1, c2 in zip(s1.lower(), s2.lower()) if c1 == c2)
         return matches / max(len(s1), len(s2))
 
-    def _read_multiline_quoted_text(self, lines: List[str], start_index: int, initial_text: str) -> Tuple[str, Optional[str], int]:
+    def _read_multiline_quoted_text(
+        self, lines: List[str], start_index: int, initial_text: str
+    ) -> Tuple[str, List[str], Optional[str], int]:
         """
         Read multi-line quoted text when a quote is opened but not closed on the same line.
 
         Returns:
-            Tuple of (text, condition, next_line_index)
+            Tuple of (text, tags, condition, next_line_index)
         """
         text_parts = [initial_text]
         i = start_index
@@ -197,7 +264,7 @@ class DialogueParser:
             stripped = line.strip()
 
             # Skip empty lines and comments within multi-line text
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 i += 1
                 continue
 
@@ -206,40 +273,55 @@ class DialogueParser:
                 # Find the closing quote
                 quote_pos = stripped.find('"')
                 before_quote = stripped[:quote_pos].strip()
-                after_quote = stripped[quote_pos + 1:].strip()
+                after_quote = stripped[quote_pos + 1 :].strip()
 
                 # Add the text before the closing quote
                 if before_quote:
                     text_parts.append(before_quote)
 
-                # Check for condition after the closing quote
+                # Extract tags and condition from after_quote
+                # Format: [tag1, tag2] {condition}
+                tags = []
                 condition = None
-                if after_quote.startswith('{') and after_quote.endswith('}'):
+
+                # First extract tags [...]
+                if "[" in after_quote:
+                    bracket_start = after_quote.find("[")
+                    bracket_end = after_quote.find("]", bracket_start)
+                    if bracket_end > bracket_start:
+                        tags_str = after_quote[bracket_start + 1 : bracket_end].strip()
+                        if tags_str:
+                            tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
+                        after_quote = after_quote[:bracket_start].strip() + " " + after_quote[bracket_end + 1 :].strip()
+                        after_quote = after_quote.strip()
+
+                # Then extract condition {...}
+                if after_quote.startswith("{") and after_quote.endswith("}"):
                     condition = after_quote[1:-1].strip()
-                elif '{' in after_quote:
-                    cond_start = after_quote.find('{')
-                    cond_end = after_quote.rfind('}')
+                elif "{" in after_quote:
+                    cond_start = after_quote.find("{")
+                    cond_end = after_quote.rfind("}")
                     if cond_end > cond_start:
-                        condition = after_quote[cond_start + 1:cond_end].strip()
+                        condition = after_quote[cond_start + 1 : cond_end].strip()
 
                 # Join all parts with a single space
-                final_text = ' '.join(text_parts)
-                return final_text, condition, i + 1
+                final_text = " ".join(text_parts)
+                return final_text, tags, condition, i + 1
             else:
                 # No closing quote - this is a continuation line
                 text_parts.append(stripped)
                 i += 1
 
         # Reached end of file without closing quote - return what we have
-        final_text = ' '.join(text_parts)
-        return final_text, None, i
+        final_text = " ".join(text_parts)
+        return final_text, [], None, i
 
     def parse_file(self, file_path: Path) -> Dialogue:
         """Parse a .dlg file and return dialogue structure"""
         if not file_path.exists():
             raise FileNotFoundError(f"Dialogue file not found: {file_path}")
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         return self.parse_lines(lines)
@@ -255,26 +337,26 @@ class DialogueParser:
             line = lines[i].rstrip()
 
             # Skip empty lines and comments
-            if not line or line.strip().startswith('#'):
+            if not line or line.strip().startswith("#"):
                 i += 1
                 continue
 
             # Parse character definitions
-            if line.strip() == '[characters]':
+            if line.strip() == "[characters]":
                 i = self._parse_characters(lines, i + 1)
                 continue
 
             # Parse state initialization section
-            if line.strip() == '[state]':
+            if line.strip() == "[state]":
                 i = self._parse_state(lines, i + 1)
                 continue
 
             # Parse dialogue node(s) - can have multiple stacked labels
-            if line.strip().startswith('[') and line.strip().endswith(']'):
+            if line.strip().startswith("[") and line.strip().endswith("]"):
                 node_ids = [line.strip()[1:-1]]
                 # Check for additional stacked node labels
                 j = i + 1
-                while j < len(lines) and lines[j].strip().startswith('[') and lines[j].strip().endswith(']'):
+                while j < len(lines) and lines[j].strip().startswith("[") and lines[j].strip().endswith("]"):
                     node_ids.append(lines[j].strip()[1:-1])
                     j += 1
                 i = self._parse_node(lines, j, node_ids)
@@ -285,8 +367,8 @@ class DialogueParser:
         # Set start node if not explicitly defined
         if not self.dialogue.start_node and self.dialogue.nodes:
             # First node becomes start if no [start] node exists
-            if 'start' in self.dialogue.nodes:
-                self.dialogue.start_node = 'start'
+            if "start" in self.dialogue.nodes:
+                self.dialogue.start_node = "start"
             else:
                 self.dialogue.start_node = next(iter(self.dialogue.nodes.keys()))
 
@@ -300,17 +382,17 @@ class DialogueParser:
             line = lines[i].strip()
 
             # Stop at next section or empty line followed by non-character line
-            if line.startswith('[') and line.endswith(']'):
+            if line.startswith("[") and line.endswith("]"):
                 break
 
             # Skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 i += 1
                 continue
 
             # Parse character definition (id: Display Name)
-            if ':' in line:
-                char_id, display_name = line.split(':', 1)
+            if ":" in line:
+                char_id, display_name = line.split(":", 1)
                 self.dialogue.characters[char_id.strip()] = display_name.strip()
 
             i += 1
@@ -325,16 +407,16 @@ class DialogueParser:
             line = lines[i].strip()
 
             # Stop at next section
-            if line.startswith('[') and line.endswith(']'):
+            if line.startswith("[") and line.endswith("]"):
                 break
 
             # Skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 i += 1
                 continue
 
             # Parse commands (lines starting with *)
-            if line.startswith('*'):
+            if line.startswith("*"):
                 cmd_text = line[1:].strip()
                 self.dialogue.initial_state.append(cmd_text)
                 # Validate command syntax at parse time
@@ -362,18 +444,18 @@ class DialogueParser:
             line = lines[i].rstrip()
 
             # Stop at next node
-            if line.strip().startswith('[') and line.strip().endswith(']'):
+            if line.strip().startswith("[") and line.strip().endswith("]"):
                 break
 
             # Skip empty lines and comments
-            if not line or line.strip().startswith('#'):
+            if not line or line.strip().startswith("#"):
                 i += 1
                 continue
 
             stripped = line.strip()
 
             # Parse command/effect
-            if stripped.startswith('*'):
+            if stripped.startswith("*"):
                 cmd_text = stripped[1:].strip()
                 primary_node.commands.append(cmd_text)
                 # Validate command syntax at parse time
@@ -383,20 +465,20 @@ class DialogueParser:
                 continue
 
             # Parse choice
-            if stripped.startswith('->'):
+            if stripped.startswith("->"):
                 i = self._parse_choice(lines, i, primary_node)
                 continue
 
             # Parse speaker line
-            if ':' in stripped and not stripped.startswith('{'):
-                speaker, rest = stripped.split(':', 1)
+            if ":" in stripped and not stripped.startswith("{"):
+                speaker, rest = stripped.split(":", 1)
                 rest = rest.strip()
 
                 # Check for multi-line quoted text (quote opened but not closed)
                 if rest.startswith('"') and rest.count('"') == 1:
                     # Multi-line: quote opened but not closed on this line
                     initial_text = rest[1:].strip()  # Remove opening quote
-                    text, condition, next_i = self._read_multiline_quoted_text(lines, i + 1, initial_text)
+                    text, tags, condition, next_i = self._read_multiline_quoted_text(lines, i + 1, initial_text)
 
                     # Validate condition syntax if present
                     if condition:
@@ -407,33 +489,40 @@ class DialogueParser:
                         speaker=speaker.strip(),
                         text=text,
                         condition=condition,
-                        line_number=i + 1
+                        tags=tags,
+                        line_number=i + 1,
                     )
                     primary_node.lines.append(dialogue_line)
                     i = next_i
                     continue
 
-                # Single-line: extract condition if present (at the end after quoted text)
+                # Single-line: extract tags and condition if present
+                # Format: "text" [tag1, tag2] {condition}
                 condition = None
+                tags = []
                 text = rest
 
-                if '{' in rest:
+                # First extract tags [...]
+                text, tags = self._extract_tags(text)
+
+                # Then extract condition {...}
+                if "{" in text:
                     # Check if the { appears after the last quote (if quotes exist)
-                    if '"' in rest:
-                        if rest.rindex('{') > rest.rindex('"'):
-                            cond_start = rest.rindex('{')
-                            text = rest[:cond_start].strip()
-                            condition = rest[cond_start:].strip()
+                    if '"' in text:
+                        if text.rindex("{") > text.rindex('"'):
+                            cond_start = text.rindex("{")
+                            condition = text[cond_start:].strip()
+                            text = text[:cond_start].strip()
                             # Remove the curly braces
-                            if condition.startswith('{') and condition.endswith('}'):
+                            if condition.startswith("{") and condition.endswith("}"):
                                 condition = condition[1:-1].strip()
                     else:
                         # No quotes, so check if { is at the end
-                        cond_start = rest.rindex('{')
-                        text = rest[:cond_start].strip()
-                        condition = rest[cond_start:].strip()
+                        cond_start = text.rindex("{")
+                        condition = text[cond_start:].strip()
+                        text = text[:cond_start].strip()
                         # Remove the curly braces
-                        if condition.startswith('{') and condition.endswith('}'):
+                        if condition.startswith("{") and condition.endswith("}"):
                             condition = condition[1:-1].strip()
 
                 # Remove quotes from text
@@ -449,7 +538,8 @@ class DialogueParser:
                     speaker=speaker.strip(),
                     text=text,
                     condition=condition,
-                    line_number=i + 1
+                    tags=tags,
+                    line_number=i + 1,
                 )
                 primary_node.lines.append(dialogue_line)
                 i += 1
@@ -462,10 +552,10 @@ class DialogueParser:
         for node_id in node_ids[1:]:
             alias_node = DialogueNode(
                 id=node_id,
-                lines=primary_node.lines,      # Share the list reference (read-only expected)
+                lines=primary_node.lines,  # Share the list reference (read-only expected)
                 choices=primary_node.choices,  # Share the list reference (read-only expected)
                 commands=primary_node.commands,  # Share the list reference (read-only expected)
-                line_number=primary_node.line_number
+                line_number=primary_node.line_number,
             )
             self.dialogue.nodes[node_id] = alias_node
 
@@ -483,21 +573,21 @@ class DialogueParser:
         # or a GOTO (no colon, or colon only inside condition)
         # -> target: "text" = choice (colon before { or no {)
         # -> target {condition} = conditional GOTO (colon only inside {})
-        has_colon = ':' in choice_text
-        has_condition = '{' in choice_text
+        has_colon = ":" in choice_text
+        has_condition = "{" in choice_text
 
         # Check if colon comes before the condition brace
         colon_before_condition = False
         if has_colon and has_condition:
-            colon_pos = choice_text.index(':')
-            brace_pos = choice_text.index('{')
+            colon_pos = choice_text.index(":")
+            brace_pos = choice_text.index("{")
             colon_before_condition = colon_pos < brace_pos
         elif has_colon and not has_condition:
             colon_before_condition = True
 
         # Parse target and text
         if colon_before_condition:
-            target, rest = choice_text.split(':', 1)
+            target, rest = choice_text.split(":", 1)
             target = target.strip()
             rest = rest.strip()
 
@@ -505,19 +595,17 @@ class DialogueParser:
             if rest.startswith('"') and rest.count('"') == 1:
                 # Multi-line: quote opened but not closed on this line
                 initial_text = rest[1:].strip()  # Remove opening quote
-                text, condition, next_index = self._read_multiline_quoted_text(lines, start_index + 1, initial_text)
+                text, _tags, condition, next_index = self._read_multiline_quoted_text(
+                    lines, start_index + 1, initial_text
+                )
+                # Note: tags are ignored for choices (only used on dialogue lines)
 
                 # Validate condition syntax if present
                 if condition:
                     condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
                     self.dialogue.warnings.extend(condition_warnings)
 
-                choice = Choice(
-                    target=target,
-                    text=text,
-                    condition=condition,
-                    line_number=start_index + 1
-                )
+                choice = Choice(target=target, text=text, condition=condition, line_number=start_index + 1)
                 node.choices.append(choice)
                 return next_index
 
@@ -526,23 +614,23 @@ class DialogueParser:
             text = rest
 
             # Look for condition at the end (after the quoted text)
-            if '{' in rest:
+            if "{" in rest:
                 # Check if the { appears after the last quote (if quotes exist)
                 if '"' in rest:
-                    if rest.rindex('{') > rest.rindex('"'):
-                        cond_start = rest.rindex('{')
+                    if rest.rindex("{") > rest.rindex('"'):
+                        cond_start = rest.rindex("{")
                         text = rest[:cond_start].strip()
                         condition = rest[cond_start:].strip()
                         # Remove the curly braces
-                        if condition.startswith('{') and condition.endswith('}'):
+                        if condition.startswith("{") and condition.endswith("}"):
                             condition = condition[1:-1].strip()
                 else:
                     # No quotes, so check if { is at the end
-                    cond_start = rest.rindex('{')
+                    cond_start = rest.rindex("{")
                     text = rest[:cond_start].strip()
                     condition = rest[cond_start:].strip()
                     # Remove the curly braces
-                    if condition.startswith('{') and condition.endswith('}'):
+                    if condition.startswith("{") and condition.endswith("}"):
                         condition = condition[1:-1].strip()
 
             # Remove quotes from text
@@ -554,22 +642,17 @@ class DialogueParser:
                 condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
                 self.dialogue.warnings.extend(condition_warnings)
 
-            choice = Choice(
-                target=target,
-                text=text,
-                condition=condition,
-                line_number=start_index + 1
-            )
+            choice = Choice(target=target, text=text, condition=condition, line_number=start_index + 1)
         else:
             # No colon - could be simple GOTO or conditional GOTO
             # -> target OR -> target {condition}
-            if '{' in choice_text:
+            if "{" in choice_text:
                 # Conditional GOTO: -> target {condition}
-                cond_start = choice_text.index('{')
+                cond_start = choice_text.index("{")
                 target = choice_text[:cond_start].strip()
                 condition = choice_text[cond_start:].strip()
                 # Remove the curly braces
-                if condition.startswith('{') and condition.endswith('}'):
+                if condition.startswith("{") and condition.endswith("}"):
                     condition = condition[1:-1].strip()
 
                 # Validate condition syntax
@@ -581,16 +664,11 @@ class DialogueParser:
                     target=target,
                     text="",  # No text for conditional GOTO
                     condition=condition,
-                    line_number=start_index + 1
+                    line_number=start_index + 1,
                 )
             else:
                 # Simple GOTO without condition (like -> END or -> next_node)
-                choice = Choice(
-                    target=choice_text,
-                    text="",
-                    condition=None,
-                    line_number=start_index + 1
-                )
+                choice = Choice(target=choice_text, text="", condition=None, line_number=start_index + 1)
 
         node.choices.append(choice)
         return next_index
@@ -602,7 +680,7 @@ class DialogueParser:
         # Check for undefined nodes in choices
         for node_id, node in self.dialogue.nodes.items():
             for choice in node.choices:
-                if choice.target != 'END' and choice.target not in self.dialogue.nodes:
+                if choice.target != "END" and choice.target not in self.dialogue.nodes:
                     self.dialogue.errors.append(
                         f"Line {choice.line_number}: Undefined target node '{choice.target}' in node '{node_id}'"
                     )
@@ -620,15 +698,11 @@ class DialogueParser:
         reachable = self._find_reachable_nodes()
         for node_id in self.dialogue.nodes:
             if node_id not in reachable and node_id != self.dialogue.start_node:
-                self.dialogue.warnings.append(
-                    f"Node '{node_id}' is unreachable from start"
-                )
+                self.dialogue.warnings.append(f"Node '{node_id}' is unreachable from start")
 
         # Check that there's at least one path to END
         if not self._has_path_to_end():
-            self.dialogue.warnings.append(
-                "No path leads to END - conversation may not be able to terminate"
-            )
+            self.dialogue.warnings.append("No path leads to END - conversation may not be able to terminate")
 
         return valid and len(self.dialogue.errors) == 0
 
@@ -642,7 +716,7 @@ class DialogueParser:
 
         while to_visit:
             current = to_visit.pop(0)
-            if current in visited or current == 'END':
+            if current in visited or current == "END":
                 continue
 
             visited.add(current)
@@ -650,7 +724,7 @@ class DialogueParser:
             if current in self.dialogue.nodes:
                 node = self.dialogue.nodes[current]
                 for choice in node.choices:
-                    if choice.target != 'END' and choice.target not in visited:
+                    if choice.target != "END" and choice.target not in visited:
                         to_visit.append(choice.target)
 
         return visited
@@ -659,7 +733,7 @@ class DialogueParser:
         """Check if there's at least one path that leads to END"""
         for node in self.dialogue.nodes.values():
             for choice in node.choices:
-                if choice.target == 'END':
+                if choice.target == "END":
                     return True
         return False
 
@@ -670,12 +744,12 @@ class DialogueParser:
         total_commands = sum(len(node.commands) for node in self.dialogue.nodes.values())
 
         return {
-            'characters': len(self.dialogue.characters),
-            'nodes': len(self.dialogue.nodes),
-            'dialogue_lines': total_lines,
-            'choices': total_choices,
-            'commands': total_commands,
-            'initial_state_commands': len(self.dialogue.initial_state),
-            'errors': len(self.dialogue.errors),
-            'warnings': len(self.dialogue.warnings)
+            "characters": len(self.dialogue.characters),
+            "nodes": len(self.dialogue.nodes),
+            "dialogue_lines": total_lines,
+            "choices": total_choices,
+            "commands": total_commands,
+            "initial_state_commands": len(self.dialogue.initial_state),
+            "errors": len(self.dialogue.errors),
+            "warnings": len(self.dialogue.warnings),
         }

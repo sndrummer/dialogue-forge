@@ -2,8 +2,8 @@
 Export .dlg dialogue files to JSON for use in Godot
 """
 
-import sys
 import json
+import sys
 from pathlib import Path
 
 from dialogue_forge.parser.parser import DialogueParser
@@ -17,20 +17,20 @@ def export_to_json(dlg_path: Path, output_path: Path = None):
     dialogue = parser.parse_file(dlg_path)
 
     if not parser.validate():
-        print(f"⚠️  Warning: Dialogue has validation issues:")
+        print("⚠️  Warning: Dialogue has validation issues:")
         for error in dialogue.errors:
             print(f"  • {error}")
 
     # Prepare output path
     if output_path is None:
-        output_path = dlg_path.with_suffix('.json')
+        output_path = dlg_path.with_suffix(".json")
 
     # Convert to JSON-serializable format
     json_data = {
         "characters": dialogue.characters,
         "start_node": dialogue.start_node,
         "initial_state": dialogue.initial_state,
-        "nodes": {}
+        "nodes": {},
     }
 
     # Convert each node
@@ -40,23 +40,19 @@ def export_to_json(dlg_path: Path, output_path: Path = None):
                 {
                     "speaker": line.speaker,
                     "text": line.text,
-                    "condition": line.condition
+                    "condition": line.condition,
+                    "tags": line.tags,
                 }
                 for line in node.lines
             ],
             "commands": node.commands,
             "choices": [
-                {
-                    "target": choice.target,
-                    "text": choice.text,
-                    "condition": choice.condition
-                }
-                for choice in node.choices
-            ]
+                {"target": choice.target, "text": choice.text, "condition": choice.condition} for choice in node.choices
+            ],
         }
 
     # Write JSON file
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(json_data, f, indent=2, ensure_ascii=False)
 
     print(f"✅ Exported to: {output_path}")

@@ -4,31 +4,31 @@ Enhanced validation script for .dlg dialogue files with precise error reporting.
 Uses DialogueParser for parsing, then performs additional semantic validation.
 """
 
-import sys
 import re
-from pathlib import Path
-from typing import List, Dict, Set, Optional
+import sys
 from dataclasses import dataclass
-from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Optional, Set
 
-from dialogue_forge.parser.parser import DialogueParser, Dialogue, DialogueNode
+from dialogue_forge.parser.parser import Dialogue, DialogueParser
 
 
 # ANSI color codes for terminal output
 class Colors:
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    RESET = '\033[0m'
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    GREEN = "\033[92m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+    RESET = "\033[0m"
 
 
 @dataclass
 class ValidationError:
     """Represents a validation error with location info"""
+
     line_number: int
     column: int
     severity: str  # 'error' or 'warning'
@@ -71,7 +71,7 @@ class DialogueValidator:
 
         try:
             # Read file for context in error messages
-            with open(self.file_path, 'r', encoding='utf-8') as f:
+            with open(self.file_path, "r", encoding="utf-8") as f:
                 self.lines = f.readlines()
 
             # Step 1: Parse file using DialogueParser
@@ -102,12 +102,12 @@ class DialogueValidator:
         """Convert parser errors/warnings to ValidationError format"""
         for error in self.dialogue.errors:
             # Try to extract line number from error message
-            line_match = re.search(r'Line (\d+)', error)
+            line_match = re.search(r"Line (\d+)", error)
             line_num = int(line_match.group(1)) if line_match else 1
             self._add_error(line_num, 1, error)
 
         for warning in self.dialogue.warnings:
-            line_match = re.search(r'Line (\d+)', warning)
+            line_match = re.search(r"Line (\d+)", warning)
             line_num = int(line_match.group(1)) if line_match else 1
             self._add_warning(line_num, 1, warning)
 
@@ -153,49 +153,49 @@ class DialogueValidator:
 
         cmd = parts[0].lower()
 
-        if cmd == 'set':
+        if cmd == "set":
             # *set variable = value
-            if '=' in command:
-                var_name = command[3:].split('=')[0].strip()
+            if "=" in command:
+                var_name = command[3:].split("=")[0].strip()
                 self.variables_set.add(var_name)
 
-        elif cmd in ('add', 'sub'):
+        elif cmd in ("add", "sub"):
             # *add variable = value
-            if '=' in command:
-                var_name = command[len(cmd):].split('=')[0].strip()
+            if "=" in command:
+                var_name = command[len(cmd) :].split("=")[0].strip()
                 self.variables_set.add(var_name)
 
-        elif cmd == 'give_item':
+        elif cmd == "give_item":
             if len(parts) >= 2:
                 self.items_given.add(parts[1])
 
-        elif cmd == 'remove_item':
+        elif cmd == "remove_item":
             if len(parts) >= 2:
                 # Removing implies it should exist
                 pass
 
-        elif cmd == 'add_companion':
+        elif cmd == "add_companion":
             if len(parts) >= 2:
                 self.companions_added.add(parts[1])
 
     def _process_condition(self, condition: str, line_num: int):
         """Process a condition and track variable/item/companion usage"""
         # Track has_item checks
-        for match in re.finditer(r'has_item:(\w+)', condition):
+        for match in re.finditer(r"has_item:(\w+)", condition):
             self.items_checked.add(match.group(1))
 
         # Track companion checks
-        for match in re.finditer(r'companion:(\w+)', condition):
+        for match in re.finditer(r"companion:(\w+)", condition):
             self.companions_checked.add(match.group(1))
 
         # Extract variables from condition
         # Remove has_item: and companion: patterns first
-        cleaned = re.sub(r'has_item:\w+', '', condition)
-        cleaned = re.sub(r'companion:\w+', '', cleaned)
+        cleaned = re.sub(r"has_item:\w+", "", condition)
+        cleaned = re.sub(r"companion:\w+", "", cleaned)
 
         # Find variable names (excluding operators)
-        operators = {'true', 'false', 'and', 'or', 'not', 'has_item', 'companion'}
-        for match in re.finditer(r'\b([a-zA-Z_]\w*)\b', cleaned):
+        operators = {"true", "false", "and", "or", "not", "has_item", "companion"}
+        for match in re.finditer(r"\b([a-zA-Z_]\w*)\b", cleaned):
             var = match.group(1)
             if var not in operators:
                 self.variables_used.add(var)
@@ -207,13 +207,16 @@ class DialogueValidator:
         for var in undefined:
             # Find where it's used
             for line_num, line in enumerate(self.lines, 1):
-                if '{' in line and var in line:
+                if "{" in line and var in line:
                     # Make sure it's not part of has_item: or companion:
-                    if not (f'has_item:{var}' in line or f'companion:{var}' in line):
+                    if not (f"has_item:{var}" in line or f"companion:{var}" in line):
                         # Make sure it's actually in a condition, not just in text
-                        if re.search(r'\{[^}]*\b' + re.escape(var) + r'\b[^}]*\}', line):
-                            self._add_warning(line_num, line.index(var) + 1,
-                                            f"Variable '{var}' used but never set")
+                        if re.search(r"\{[^}]*\b" + re.escape(var) + r"\b[^}]*\}", line):
+                            self._add_warning(
+                                line_num,
+                                line.index(var) + 1,
+                                f"Variable '{var}' used but never set",
+                            )
                             break
 
     def _check_undefined_items(self):
@@ -222,10 +225,9 @@ class DialogueValidator:
 
         for item in undefined:
             for line_num, line in enumerate(self.lines, 1):
-                if f'has_item:{item}' in line:
-                    col = line.index(f'has_item:{item}') + 10
-                    self._add_warning(line_num, col,
-                                    f"Item '{item}' checked but never given via *give_item")
+                if f"has_item:{item}" in line:
+                    col = line.index(f"has_item:{item}") + 10
+                    self._add_warning(line_num, col, f"Item '{item}' checked but never given via *give_item")
                     break
 
     def _check_undefined_companions(self):
@@ -234,10 +236,13 @@ class DialogueValidator:
 
         for companion in undefined:
             for line_num, line in enumerate(self.lines, 1):
-                if f'companion:{companion}' in line:
-                    col = line.index(f'companion:{companion}') + 10
-                    self._add_warning(line_num, col,
-                                    f"Companion '{companion}' checked but never added via *add_companion")
+                if f"companion:{companion}" in line:
+                    col = line.index(f"companion:{companion}") + 10
+                    self._add_warning(
+                        line_num,
+                        col,
+                        f"Companion '{companion}' checked but never added via *add_companion",
+                    )
                     break
 
     def _detect_stacked_nodes(self):
@@ -251,9 +256,9 @@ class DialogueValidator:
         for line_num, line in enumerate(self.lines, 1):
             stripped = line.strip()
 
-            if stripped.startswith('[') and stripped.endswith(']'):
+            if stripped.startswith("[") and stripped.endswith("]"):
                 node_id = stripped[1:-1]
-                if node_id not in ('characters', 'state') and node_id in self.dialogue.nodes:
+                if node_id not in ("characters", "state") and node_id in self.dialogue.nodes:
                     if prev_was_node:
                         current_stack.append(node_id)
                     else:
@@ -266,7 +271,7 @@ class DialogueValidator:
                 else:
                     prev_was_node = False
             else:
-                if stripped and not stripped.startswith('#'):
+                if stripped and not stripped.startswith("#"):
                     # Save stack if it had multiple nodes
                     if len(current_stack) > 1:
                         for n in current_stack:
@@ -293,24 +298,23 @@ class DialogueValidator:
 
             # Check if node has no choices (dead end)
             if not node.choices:
-                self._add_warning(node.line_number, 1,
-                                f"Node '{node_id}' has no choices (dead end)")
+                self._add_warning(node.line_number, 1, f"Node '{node_id}' has no choices (dead end)")
 
     def _add_error(self, line: int, column: int, message: str, suggestion: str = None):
         """Add an error"""
-        context = self.lines[line-1].rstrip() if line <= len(self.lines) else None
-        self.errors.append(ValidationError(line, column, 'error', message, context, suggestion))
+        context = self.lines[line - 1].rstrip() if line <= len(self.lines) else None
+        self.errors.append(ValidationError(line, column, "error", message, context, suggestion))
 
     def _add_warning(self, line: int, column: int, message: str, suggestion: str = None):
         """Add a warning"""
-        context = self.lines[line-1].rstrip() if line <= len(self.lines) else None
-        self.warnings.append(ValidationError(line, column, 'warning', message, context, suggestion))
+        context = self.lines[line - 1].rstrip() if line <= len(self.lines) else None
+        self.warnings.append(ValidationError(line, column, "warning", message, context, suggestion))
 
     def _report_results(self):
         """Report validation results"""
-        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
+        print(f"\n{Colors.BOLD}{'=' * 80}{Colors.RESET}")
         print(f"{Colors.BOLD}VALIDATION REPORT: {Colors.CYAN}{self.file_path.name}{Colors.RESET}")
-        print(f"{Colors.BOLD}{'='*80}{Colors.RESET}")
+        print(f"{Colors.BOLD}{'=' * 80}{Colors.RESET}")
 
         if not self.errors and not self.warnings:
             print(f"\n{Colors.GREEN}{Colors.BOLD}✅ VALIDATION PASSED - No issues found!{Colors.RESET}")
@@ -322,7 +326,7 @@ class DialogueValidator:
             print(f"\n{Colors.RED}{Colors.BOLD}❌ ERRORS ({len(self.errors)}):{Colors.RESET}")
             print(f"{Colors.RED}{'━' * 60}{Colors.RESET}")
             for i, error in enumerate(sorted(self.errors, key=lambda e: e.line_number), 1):
-                self._print_issue(error, 'error')
+                self._print_issue(error, "error")
                 if i < len(self.errors):
                     print(f"{Colors.RED}{'─' * 60}{Colors.RESET}")
 
@@ -331,12 +335,12 @@ class DialogueValidator:
             print(f"\n{Colors.YELLOW}{Colors.BOLD}⚠️  WARNINGS ({len(self.warnings)}):{Colors.RESET}")
             print(f"{Colors.YELLOW}{'━' * 60}{Colors.RESET}")
             for i, warning in enumerate(sorted(self.warnings, key=lambda w: w.line_number), 1):
-                self._print_issue(warning, 'warning')
+                self._print_issue(warning, "warning")
                 if i < len(self.warnings):
                     print(f"{Colors.YELLOW}{'─' * 60}{Colors.RESET}")
 
         # Print summary
-        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
+        print(f"\n{Colors.BOLD}{'=' * 80}{Colors.RESET}")
         error_text = f"{Colors.RED}{len(self.errors)} error(s){Colors.RESET}"
         warning_text = f"{Colors.YELLOW}{len(self.warnings)} warning(s){Colors.RESET}"
         print(f"{Colors.BOLD}Summary:{Colors.RESET} {error_text}, {warning_text}")
@@ -348,11 +352,13 @@ class DialogueValidator:
 
         self._print_statistics()
 
-    def _print_issue(self, issue: ValidationError, issue_type: str = 'error'):
+    def _print_issue(self, issue: ValidationError, issue_type: str = "error"):
         """Print a single issue with context"""
-        color = Colors.RED if issue_type == 'error' else Colors.YELLOW
+        color = Colors.RED if issue_type == "error" else Colors.YELLOW
 
-        print(f"\n  {color}{Colors.BOLD}Line {issue.line_number}{Colors.RESET}:{issue.column} - {Colors.BOLD}{issue.message}{Colors.RESET}")
+        line_info = f"{color}{Colors.BOLD}Line {issue.line_number}{Colors.RESET}:{issue.column}"
+        msg = f"{Colors.BOLD}{issue.message}{Colors.RESET}"
+        print(f"\n  {line_info} - {msg}")
 
         if issue.context:
             line_num_str = f"{color}{issue.line_number:4d}{Colors.RESET}"

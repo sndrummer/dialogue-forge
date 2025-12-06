@@ -12,8 +12,10 @@ merchant: Shop Merchant
 *set talked_to_elder = false
 
 [start]
-elder: "Welcome to our village, traveler!"
-elder: "I am the village elder. How may I help you?"
+# Tags are OPTIONAL metadata for game integration (e.g., character portraits)
+# Format: speaker: "text" [tag1, tag2]
+elder: "Welcome to our village, traveler!" [warm, welcoming]
+elder: "I am the village elder. How may I help you?" [curious]
 -> ask_about_village: "Tell me about this place."
 -> ask_about_shop: "Where can I buy supplies?"
 -> END: "Just passing through. Goodbye."
@@ -89,10 +91,10 @@ elder: "Safe travels!"
 -> standard_farewell
 
 [reputation_farewell]
-elder: "You've been a great friend to our village. Come back anytime!"
+elder: "You've been a great friend to our village. Come back anytime!" [happy, grateful]
 *set village_friend = true
 -> END
 
 [standard_farewell]
-elder: "May the road rise to meet you."
+elder: "May the road rise to meet you." [neutral]
 -> END

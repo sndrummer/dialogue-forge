@@ -204,6 +204,143 @@ npc: "Yes, the prophecy foretold your
         assert lines[3].condition == 'has_prophecy'
 
 
+class TestTags:
+    """Test tags parsing (optional metadata on dialogue lines)."""
+
+    def test_single_tag(self):
+        """Test parsing a single tag on a dialogue line."""
+        content = """
+[characters]
+peng: Peng
+
+[start]
+peng: "I found you!" [happy]
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert line.text == "I found you!"
+        assert line.tags == ['happy']
+        assert line.condition is None
+
+    def test_multiple_tags(self):
+        """Test parsing multiple comma-separated tags."""
+        content = """
+[characters]
+peng: Peng
+
+[start]
+peng: "It was so hard..." [sad, tired, relieved]
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert line.text == "It was so hard..."
+        assert line.tags == ['sad', 'tired', 'relieved']
+
+    def test_tags_with_condition(self):
+        """Test tags combined with conditions."""
+        content = """
+[characters]
+peng: Peng
+
+[start]
+peng: "Thank you for saving me!" [grateful, tearful] {saved_peng}
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert line.text == "Thank you for saving me!"
+        assert line.tags == ['grateful', 'tearful']
+        assert line.condition == 'saved_peng'
+
+    def test_no_tags(self):
+        """Test that lines without tags have empty tags list."""
+        content = """
+[characters]
+hero: Hero
+
+[start]
+hero: "Just a normal line."
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert line.text == "Just a normal line."
+        assert line.tags == []
+
+    def test_multiline_with_tags(self):
+        """Test multi-line dialogue with tags at the end."""
+        content = """
+[characters]
+elder: Elder
+
+[start]
+elder: "Welcome to our village.
+    We have been waiting for you
+    for a long time." [warm, welcoming]
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert "Welcome to our village" in line.text
+        assert "for a long time" in line.text
+        assert line.tags == ['warm', 'welcoming']
+
+    def test_multiline_with_tags_and_condition(self):
+        """Test multi-line dialogue with both tags and condition."""
+        content = """
+[characters]
+elder: Elder
+
+[start]
+elder: "I see you have the artifact.
+    This changes everything." [surprised, serious] {has_item:artifact}
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        line = dialogue.nodes['start'].lines[0]
+        assert "artifact" in line.text
+        assert line.tags == ['surprised', 'serious']
+        assert line.condition == 'has_item:artifact'
+
+    def test_mixed_lines_with_and_without_tags(self):
+        """Test mixing lines with and without tags."""
+        content = """
+[characters]
+hero: Hero
+peng: Peng
+
+[start]
+hero: "Hello there!"
+peng: "Oh, it's you!" [surprised]
+hero: "Yes, I came to help." [determined]
+peng: "That's wonderful."
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        lines = dialogue.nodes['start'].lines
+        assert len(lines) == 4
+        assert lines[0].tags == []
+        assert lines[1].tags == ['surprised']
+        assert lines[2].tags == ['determined']
+        assert lines[3].tags == []
+
+
 class TestConditions:
     """Test condition parsing."""
 

@@ -2,33 +2,35 @@
 Dialogue node classes
 """
 
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class DialogueChoice:
     """Represents a player choice in dialogue"""
+
     text: str
     conditions: List[str] = field(default_factory=list)
-    consequences: List['DialogueNode'] = field(default_factory=list)
+    consequences: List["DialogueNode"] = field(default_factory=list)
     jump_to: Optional[str] = None
     actions: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
-            'text': self.text,
-            'conditions': self.conditions,
-            'consequences': [c.to_dict() for c in self.consequences],
-            'jump_to': self.jump_to,
-            'actions': self.actions
+            "text": self.text,
+            "conditions": self.conditions,
+            "consequences": [c.to_dict() for c in self.consequences],
+            "jump_to": self.jump_to,
+            "actions": self.actions,
         }
 
 
 @dataclass
 class DialogueNode:
     """Represents a node in the dialogue tree"""
+
     speaker: str
     text: str
     line_number: int = 0
@@ -42,15 +44,15 @@ class DialogueNode:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
-            'speaker': self.speaker,
-            'text': self.text,
-            'line_number': self.line_number,
-            'node_id': self.node_id,
-            'choices': [c.to_dict() for c in self.choices],
-            'conditions': self.conditions,
-            'actions': self.actions,
-            'jump_to': self.jump_to,
-            'metadata': self.metadata
+            "speaker": self.speaker,
+            "text": self.text,
+            "line_number": self.line_number,
+            "node_id": self.node_id,
+            "choices": [c.to_dict() for c in self.choices],
+            "conditions": self.conditions,
+            "actions": self.actions,
+            "jump_to": self.jump_to,
+            "metadata": self.metadata,
         }
 
     def is_branch(self) -> bool:
