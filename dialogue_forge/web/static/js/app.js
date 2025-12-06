@@ -880,25 +880,6 @@ class DialoguePlayer {
         await this.showChoices(node.choices);
     }
 
-    // Emoji mappings for common emotion tags
-    static EMOTION_EMOJIS = {
-        // Basic emotions
-        happy: '😊', sad: '😢', angry: '😠', surprised: '😮', scared: '😨',
-        excited: '🤩', nervous: '😰', confused: '😕', proud: '😤', shy: '😳',
-        tired: '😴', bored: '😒', disgusted: '🤢', love: '😍', crying: '😭',
-        laughing: '😂', smirk: '😏', worried: '😟', relieved: '😌', grateful: '🙏',
-        determined: '💪', thinking: '🤔', shocked: '😱', calm: '😌', cold: '🥶',
-        embarrassed: '😳', flustered: '😳',
-        // States
-        whispering: '🤫', shouting: '📢', serious: '😐', neutral: '😐',
-        warm: '☀️', welcoming: '👋', curious: '🧐', impressed: '👏',
-        tearful: '🥺', confident: '😎', brave: '🦁', waving: '👋'
-    };
-
-    getEmotionEmoji(tag) {
-        return DialoguePlayer.EMOTION_EMOJIS[tag.toLowerCase()] || null;
-    }
-
     async displayDialogueLine(speaker, text, tags = []) {
         const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
         const speakerName = this.characters[speaker] || speaker;
@@ -908,52 +889,22 @@ class DialoguePlayer {
         box.className = `dialogue-box ${speaker === 'narrator' ? 'narrator' : ''} ${speaker === 'hero' ? 'player' : 'npc'}`;
 
         if (speaker !== 'narrator') {
-            // Create header with speaker name and tags
-            const headerEl = document.createElement('div');
-            headerEl.className = 'dialogue-header';
-
-            const nameEl = document.createElement('span');
+            const nameEl = document.createElement('div');
             nameEl.className = 'dialogue-speaker';
             nameEl.textContent = speakerName;
-            headerEl.appendChild(nameEl);
-
-            // Add tags as colorful badges with emojis
-            if (tags && tags.length > 0) {
-                const tagsEl = document.createElement('span');
-                tagsEl.className = 'dialogue-tags';
-
-                tags.forEach(tag => {
-                    const badge = document.createElement('span');
-                    badge.className = 'tag-badge';
-
-                    const emoji = this.getEmotionEmoji(tag);
-                    if (emoji) {
-                        badge.innerHTML = `${emoji} ${this.escapeHtml(tag)}`;
-                    } else {
-                        badge.textContent = tag;
-                    }
-
-                    // Add color based on emotion category
-                    badge.classList.add(this.getTagColorClass(tag));
-                    tagsEl.appendChild(badge);
-                });
-
-                headerEl.appendChild(tagsEl);
-            }
-
-            box.appendChild(headerEl);
+            box.appendChild(nameEl);
         }
 
         const textEl = document.createElement('div');
         textEl.className = 'dialogue-text';
         box.appendChild(textEl);
 
-        // Always show tags in simple format below text (for clarity)
+        // Show tags in simple format below text
         if (tags && tags.length > 0) {
-            const simpleTagsEl = document.createElement('div');
-            simpleTagsEl.className = 'dialogue-tags-simple';
-            simpleTagsEl.textContent = `[${tags.join(', ')}]`;
-            box.appendChild(simpleTagsEl);
+            const tagsEl = document.createElement('div');
+            tagsEl.className = 'dialogue-tags-simple';
+            tagsEl.textContent = `[${tags.join(', ')}]`;
+            box.appendChild(tagsEl);
         }
 
         scrollArea.appendChild(box);
@@ -964,28 +915,6 @@ class DialoguePlayer {
 
         // Small pause after each line
         await this.delay(300);
-    }
-
-    getTagColorClass(tag) {
-        const t = tag.toLowerCase();
-        // Positive emotions - green/teal
-        if (['happy', 'excited', 'love', 'grateful', 'proud', 'relieved', 'warm', 'welcoming', 'confident', 'brave'].includes(t)) {
-            return 'tag-positive';
-        }
-        // Negative emotions - red/orange
-        if (['angry', 'sad', 'scared', 'crying', 'disgusted', 'tearful', 'worried'].includes(t)) {
-            return 'tag-negative';
-        }
-        // Surprised/alert - yellow
-        if (['surprised', 'shocked', 'curious', 'impressed'].includes(t)) {
-            return 'tag-alert';
-        }
-        // Neutral/calm - blue/gray
-        if (['calm', 'neutral', 'serious', 'thinking', 'tired', 'bored'].includes(t)) {
-            return 'tag-neutral';
-        }
-        // Action/state - purple
-        return 'tag-action';
     }
 
     escapeHtml(text) {
