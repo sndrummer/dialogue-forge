@@ -1,4 +1,4 @@
-.PHONY: web play validate export test lint fix format sync build clean dev help
+.PHONY: web play validate export test lint fix format sync build clean dev nvim vscode help
 
 help:
 	@echo "Available commands:"
@@ -14,6 +14,8 @@ help:
 	@echo "  make format       - Format code with ruff"
 	@echo "  make sync         - Install dependencies"
 	@echo "  make clean        - Remove cache files"
+	@echo "  make nvim         - Install DLG syntax highlighting for Neovim"
+	@echo "  make vscode       - Install DLG extension for VSCode"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make validate file=resources/example.dlg"
@@ -64,3 +66,30 @@ format:
 
 sync:
 	uv sync --all-extras
+
+# Install DLG syntax highlighting for Neovim
+nvim:
+	@mkdir -p ~/.config/nvim/after/syntax
+	@mkdir -p ~/.config/nvim/after/ftdetect
+	@mkdir -p ~/.config/nvim/after/ftplugin
+	@cp editors/neovim/syntax/dlg.vim ~/.config/nvim/after/syntax/
+	@cp editors/neovim/ftdetect/dlg.vim ~/.config/nvim/after/ftdetect/
+	@cp editors/neovim/ftplugin/dlg.vim ~/.config/nvim/after/ftplugin/
+	@echo "✅ Installed DLG syntax highlighting for Neovim"
+	@echo "   Restart Neovim to apply changes"
+
+# Install DLG extension for VSCode
+vscode:
+	@if [ -d ~/.vscode-server/extensions ]; then \
+		rm -rf ~/.vscode-server/extensions/dlg-language; \
+		cp -r editors/vscode/dlg-language ~/.vscode-server/extensions/; \
+		echo "✅ Installed DLG extension for VSCode (vscode-server)"; \
+	elif [ -d ~/.vscode/extensions ]; then \
+		rm -rf ~/.vscode/extensions/dlg-language; \
+		cp -r editors/vscode/dlg-language ~/.vscode/extensions/; \
+		echo "✅ Installed DLG extension for VSCode"; \
+	else \
+		echo "❌ Could not find VSCode extensions directory"; \
+		exit 1; \
+	fi
+	@echo "   Reload VSCode window to apply changes (Ctrl+Shift+P > Reload Window)"

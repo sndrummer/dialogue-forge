@@ -29,11 +29,11 @@ syn match dlgCharacterName ".*$" contained
 syn region dlgString start=/"/ skip=/\\"/ end=/"/ contains=dlgEscape extend
 
 " Tags [tag1, tag2] - optional metadata after strings (e.g., for emotions/portraits)
-" Note: This matches [...] that appears AFTER a string on a line, not node definitions
-syn region dlgTag start=/"\s*\zs\[/ end=/\]/ contains=dlgTagContent
-syn match dlgTagContent "[^\[\]]*" contained contains=dlgTagName,dlgTagComma
-syn match dlgTagName "\w\+" contained
-syn match dlgTagComma "," contained
+" Match [...] preceded by whitespace (not at line start, which would be a node)
+syn match dlgTag /\s\zs\[[^\]]*\]/ contains=dlgTagBracket,dlgTagName,dlgTagComma
+syn match dlgTagBracket /[\[\]]/ contained
+syn match dlgTagName /\w\+/ contained
+syn match dlgTagComma /,/ contained
 
 " Conditions {...} - can appear after strings or tags
 syn region dlgCondition start=/{/ end=/}/ contains=dlgConditionContent,dlgOperator,dlgNumber,dlgBoolean,dlgKeyword
@@ -92,15 +92,8 @@ hi def link dlgOperator       Operator
 hi def link dlgKeyword        Keyword
 hi def link dlgEnd            Error
 hi def link dlgTag            Type
-hi def link dlgTagContent     Type
+hi def link dlgTagBracket     Type
 hi def link dlgTagName        Type
-hi def link dlgTagComma       Operator
-
-" Custom highlighting for action text (italicized)
-hi dlgActionText gui=italic cterm=italic guifg=#87ceeb ctermfg=117
-
-" Custom highlighting for tags (green, to stand out as metadata)
-hi dlgTag gui=NONE cterm=NONE guifg=#10b981 ctermfg=36
-hi dlgTagName gui=NONE cterm=NONE guifg=#10b981 ctermfg=36
+hi def link dlgTagComma       Type
 
 let b:current_syntax = "dlg"

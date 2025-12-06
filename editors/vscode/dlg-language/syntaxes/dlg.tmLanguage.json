@@ -83,18 +83,18 @@
       "begin": "\\[(?!\\w+\\]\\s*$)",
       "end": "\\]",
       "beginCaptures": {
-        "0": { "name": "punctuation.bracket.tag.dlg" }
+        "0": { "name": "support.type.dlg" }
       },
       "endCaptures": {
-        "0": { "name": "punctuation.bracket.tag.dlg" }
+        "0": { "name": "support.type.dlg" }
       },
       "patterns": [
         {
-          "name": "entity.other.attribute-name.dlg",
+          "name": "support.type.dlg",
           "match": "\\b\\w+\\b"
         },
         {
-          "name": "punctuation.separator.tag.dlg",
+          "name": "support.type.dlg",
           "match": ","
         }
       ]
