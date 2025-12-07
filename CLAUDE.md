@@ -56,6 +56,8 @@ uv run dlg show-node <file.dlg> <node_name>  # Display specific node
 A Makefile is provided for convenience:
 ```bash
 make help                    # Show all available commands
+make build                   # Full rebuild: sync + fix + test
+make dev                     # Start web editor in debug mode (auto-reload)
 make web                     # Start web editor (port 5000)
 make web port=8080           # Custom port
 make play file=example.dlg   # Play a dialogue
@@ -63,8 +65,12 @@ make validate file=example.dlg  # Validate a file
 make export file=example.dlg    # Export to JSON
 make test                    # Run pytest
 make lint                    # Run ruff linter
+make fix                     # Auto-fix lint issues and format
 make format                  # Format code with ruff
 make sync                    # Install dependencies
+make clean                   # Remove cache files
+make nvim                    # Install DLG syntax for Neovim
+make vscode                  # Install DLG extension for VSCode
 ```
 
 ## Architecture
@@ -115,6 +121,7 @@ DialogueLine
 ├── speaker: str
 ├── text: str
 ├── condition: Optional[str]
+├── tags: List[str]          # Optional metadata like [happy, waving]
 └── line_number: int
 
 Choice
@@ -134,9 +141,10 @@ Note: `parser/node.py` contains legacy dataclasses that are not currently used.
 2. **Nodes** are defined as `[node_name]` (lowercase with underscores)
 3. **Stacked nodes**: Multiple consecutive `[node1][node2]` labels can point to same content
 4. **Speaker lines**: `speaker: "dialogue text"` (quotes required)
-5. **Choices**: `-> target: "choice text" {condition}` or `-> target {condition}` (condition-only)
-6. **Commands**: `*set var = value`, `*add var = num`, `*give_item name`, etc.
-7. **Conditions**: `{var}`, `{var > 5}`, `{has_item:sword}`, `{companion:peng}`, `{!var}`, `{a && b}`, `{a || b}`
+5. **Tags** (optional): `speaker: "text" [tag1, tag2]` - metadata after quoted text, before condition
+6. **Choices**: `-> target: "choice text" {condition}` or `-> target {condition}` (condition-only)
+7. **Commands**: `*set var = value`, `*add var = num`, `*give_item name`, etc.
+8. **Conditions**: `{var}`, `{var > 5}`, `{has_item:sword}`, `{companion:peng}`, `{!var}`, `{a && b}`, `{a || b}`
 
 ### Special Node Names
 - `[start]` - Optional explicit start node (otherwise first node is used)

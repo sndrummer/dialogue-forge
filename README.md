@@ -74,6 +74,7 @@ npc: "Nice to meet you! How can I help?"
 | Character | `id: Display Name` | `hero: Player` |
 | Node | `[node_name]` | `[start]` |
 | Dialogue | `speaker: "text"` | `npc: "Hello!"` |
+| Dialogue + Tags | `speaker: "text" [tags]` | `npc: "Hello!" [happy, waving]` |
 | Choice | `-> target: "text"` | `-> shop: "Show me your wares"` |
 | GOTO | `-> target` | `-> fallback` (auto-transition) |
 | Conditional GOTO | `-> target {cond}` | `-> secret {has_key}` |
