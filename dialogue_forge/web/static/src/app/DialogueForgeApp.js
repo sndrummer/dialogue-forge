@@ -200,6 +200,9 @@ export class DialogueForgeApp {
             // Check if content differs from original
             this.checkUnsavedChanges();
 
+            // Always update UI (for "no file but has content" case)
+            this.updateUnsavedUI();
+
             // Auto-preview
             if (this.autoPreview) {
                 clearTimeout(this.previewTimeout);
@@ -265,6 +268,9 @@ export class DialogueForgeApp {
         const reloadBtn = document.getElementById('reload-btn');
         const unsavedIndicator = document.getElementById('unsaved-indicator');
 
+        const hasFile = this.currentFilePath !== null;
+        const hasContent = this.editor && this.editor.getValue().trim().length > 0;
+
         if (this.hasUnsavedChanges) {
             saveBtn.classList.add('has-changes');
             unsavedIndicator.classList.remove('hidden');
@@ -273,9 +279,9 @@ export class DialogueForgeApp {
             unsavedIndicator.classList.add('hidden');
         }
 
-        // Enable/disable buttons based on file loaded
-        const hasFile = this.currentFilePath !== null;
-        saveBtn.disabled = !hasFile;
+        // Save enabled if: file with changes, OR no file but has content (Save As)
+        saveBtn.disabled = hasFile ? false : !hasContent;
+        // Reload only makes sense if we have a file on disk
         reloadBtn.disabled = !hasFile;
     }
 
@@ -617,21 +623,24 @@ export class DialogueForgeApp {
         }
     }
 
-    showNewFileModal() {
-        // Check for unsaved changes
-        if (this.hasUnsavedChanges) {
+    showNewFileModal(preserveContent = false) {
+        // Check for unsaved changes (only if not preserving content - i.e., normal "New" flow)
+        if (!preserveContent && this.hasUnsavedChanges) {
             const confirmed = confirm('You have unsaved changes. Discard them and create a new file?');
             if (!confirmed) return;
         }
 
         // Create modal
+        const title = preserveContent ? '💾 Save Dialogue As' : '📝 Create New Dialogue';
+        const buttonText = preserveContent ? 'Save' : 'Create';
+
         const modal = document.createElement('div');
         modal.className = 'new-file-modal';
         modal.innerHTML = `
             <div class="new-file-backdrop"></div>
             <div class="new-file-container">
                 <div class="new-file-header">
-                    <h2>📝 Create New Dialogue</h2>
+                    <h2>${title}</h2>
                     <button class="btn-close new-file-close">×</button>
                 </div>
                 <div class="new-file-body">
@@ -646,7 +655,7 @@ export class DialogueForgeApp {
                 </div>
                 <div class="new-file-footer">
                     <button class="btn btn-secondary new-file-cancel">Cancel</button>
-                    <button class="btn btn-primary new-file-create">Create</button>
+                    <button class="btn btn-primary new-file-create">${buttonText}</button>
                 </div>
             </div>
         `;
@@ -691,7 +700,7 @@ export class DialogueForgeApp {
             }
 
             const filename = subfolder ? `${subfolder}/${name}` : name;
-            await this.createNewFile(filename);
+            await this.createNewFile(filename, preserveContent);
             closeModal();
         });
 
@@ -705,7 +714,10 @@ export class DialogueForgeApp {
         });
     }
 
-    async createNewFile(filename) {
+    async createNewFile(filename, preserveContent = false) {
+        // Capture current content before creating file (for "Save As" flow)
+        const currentContent = preserveContent ? this.editor.getValue() : null;
+
         try {
             const response = await fetch('/api/new-file', {
                 method: 'POST',
@@ -719,11 +731,31 @@ export class DialogueForgeApp {
                 throw new Error(data.error);
             }
 
-            // Refresh file list and load the new file
+            // Refresh file list
             await this.loadFileList();
-            await this.loadFile(data.path);
 
-            this.showNotification(`Created: ${data.path}`, 'success');
+            if (preserveContent && currentContent) {
+                // "Save As" flow: keep current content, just associate with new file
+                this.currentFile = { name: filename.split('/').pop() };
+                this.currentFilePath = data.path;
+                this.originalContent = currentContent;
+                this.originalLines = currentContent.split('\n');
+
+                // Update file selector
+                const selector = document.getElementById('file-selector');
+                if (selector) {
+                    selector.value = data.path;
+                }
+
+                // Save the current content to the new file
+                await this.handleSave();
+                this.showNotification(`Saved as: ${data.path}`, 'success');
+            } else {
+                // Normal "New" flow: load the template
+                await this.loadFile(data.path);
+                this.showNotification(`Created: ${data.path}`, 'success');
+            }
+
             console.log(`📝 Created new file: ${data.path}`);
         } catch (error) {
             console.error('Failed to create file:', error);
@@ -1023,12 +1055,17 @@ Example DLG:
     }
 
     async handleSave() {
+        const content = this.editor.getValue();
+
+        // If no file is associated, prompt to create one (Save As flow)
         if (!this.currentFilePath) {
-            this.showNotification('No file loaded to save', 'warning');
+            if (!content.trim()) {
+                this.showNotification('Nothing to save', 'warning');
+                return;
+            }
+            this.showNewFileModal(true); // preserveContent = true
             return;
         }
-
-        const content = this.editor.getValue();
 
         try {
             const response = await fetch('/api/save', {
