@@ -77,6 +77,106 @@ class WebGameState:
         except Exception:
             return False
 
+    def grant_condition(self, condition: str):
+        """
+        Modify state to make a condition true.
+        Used during replay to infer state from the path taken.
+
+        If the player took a path with condition {has_item:sword}, they must have
+        had the sword, so we grant it to them for accurate replay.
+        """
+        if not condition:
+            return
+
+        # Handle AND conditions - grant all parts
+        if "&&" in condition:
+            parts = condition.split("&&")
+            for part in parts:
+                self.grant_condition(part.strip())
+            return
+
+        # Handle OR conditions - grant just the first one
+        if "||" in condition:
+            parts = condition.split("||")
+            self.grant_condition(parts[0].strip())
+            return
+
+        # Strip outer braces/whitespace
+        condition = condition.strip().strip("{}")
+
+        # has_item:X -> add item to inventory
+        match = re.match(r"has_item:(\w+)", condition)
+        if match:
+            self.inventory.add(match.group(1))
+            return
+
+        # companion:X -> add companion
+        match = re.match(r"companion:(\w+)", condition)
+        if match:
+            self.companions.add(match.group(1))
+            return
+
+        # !variable -> set to false (usually already is, but be explicit)
+        match = re.match(r"!(\w+)$", condition)
+        if match:
+            self.variables[match.group(1)] = False
+            return
+
+        # variable >= N or variable > N
+        match = re.match(r"(\w+)\s*>=\s*(\d+)", condition)
+        if match:
+            var_name, value = match.group(1), int(match.group(2))
+            current = self.variables.get(var_name, 0)
+            if not isinstance(current, (int, float)) or current < value:
+                self.variables[var_name] = value
+            return
+
+        match = re.match(r"(\w+)\s*>\s*(\d+)", condition)
+        if match:
+            var_name, value = match.group(1), int(match.group(2))
+            current = self.variables.get(var_name, 0)
+            if not isinstance(current, (int, float)) or current <= value:
+                self.variables[var_name] = value + 1
+            return
+
+        # variable <= N or variable < N
+        match = re.match(r"(\w+)\s*<=\s*(\d+)", condition)
+        if match:
+            var_name, value = match.group(1), int(match.group(2))
+            current = self.variables.get(var_name, 0)
+            if not isinstance(current, (int, float)) or current > value:
+                self.variables[var_name] = value
+            return
+
+        match = re.match(r"(\w+)\s*<\s*(\d+)", condition)
+        if match:
+            var_name, value = match.group(1), int(match.group(2))
+            current = self.variables.get(var_name, 0)
+            if not isinstance(current, (int, float)) or current >= value:
+                self.variables[var_name] = value - 1
+            return
+
+        # variable == N or variable == value
+        match = re.match(r"(\w+)\s*==\s*(.+)", condition)
+        if match:
+            var_name, value = match.group(1), match.group(2).strip()
+            if value.lower() == "true":
+                self.variables[var_name] = True
+            elif value.lower() == "false":
+                self.variables[var_name] = False
+            else:
+                try:
+                    self.variables[var_name] = int(value)
+                except ValueError:
+                    self.variables[var_name] = value
+            return
+
+        # Simple variable name -> set to true (boolean flag)
+        match = re.match(r"^(\w+)$", condition)
+        if match:
+            self.variables[match.group(1)] = True
+            return
+
     def execute_command(self, command: str):
         """Execute a game command"""
         parts = command.split()
@@ -734,13 +834,15 @@ def create_app(dialogues_root=None):
                     state.execute_command(cmd)
 
                 # If there's a next node in the path, find which choice leads there
-                # and see if it has any state-affecting side effects
                 if i < len(path) - 1:
                     next_node_id = path[i + 1]
                     for choice in node.choices:
                         if choice.target == next_node_id:
                             # Found the choice that was taken
-                            # (Choice conditions don't affect state, just gate access)
+                            # If the condition doesn't currently pass, grant what's needed
+                            # (Player must have met this condition originally to take this path)
+                            if choice.condition and not state.evaluate_condition(choice.condition):
+                                state.grant_condition(choice.condition)
                             break
 
             return jsonify({"success": True, "path": path, "path_length": len(path), "state": state.to_dict()})
