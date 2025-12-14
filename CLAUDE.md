@@ -94,7 +94,14 @@ dialogue_forge/
 └── web/
     ├── app.py            # Flask web application
     ├── templates/        # Jinja2 templates
-    └── static/           # CSS and JavaScript
+    └── static/
+        ├── css/main.css  # Styles
+        └── src/          # ES modules
+            ├── main.js           # Entry point
+            ├── app/DialogueForgeApp.js   # Main app controller
+            ├── player/DialoguePlayer.js  # Playback modal
+            ├── state/GameState.js        # Game state logic
+            └── utils/helpers.js          # Shared utilities
 ```
 
 ### Data Model
