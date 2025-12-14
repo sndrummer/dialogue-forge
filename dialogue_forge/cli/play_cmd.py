@@ -132,8 +132,15 @@ class GameState:
                 print(f"  {Colors.YELLOW}{msg}{Colors.RESET}")
             return False  # Hide options with broken conditions
 
-    def execute_command(self, command: str):
-        """Execute a game command"""
+    def execute_command(self, command: str, skip_if_exists: bool = False):
+        """
+        Execute a game command.
+
+        Args:
+            command: The command string to execute
+            skip_if_exists: If True, *set commands won't overwrite existing variables.
+                           Used when continuing to a new scene with preserved state.
+        """
         parts = command.split()
         if not parts:
             return
@@ -143,6 +150,11 @@ class GameState:
         if cmd == "set" and len(parts) >= 4:
             # *set variable = value
             var_name = parts[1]
+
+            # Skip if variable already exists and skip_if_exists is True
+            if skip_if_exists and var_name in self.variables:
+                return
+
             value = " ".join(parts[3:])
             if value.lower() == "true":
                 self.variables[var_name] = True
@@ -222,12 +234,28 @@ class GameState:
 class DialoguePlayer:
     """Interactive dialogue player"""
 
-    def __init__(self, dialogue_path: Path, verbose: bool = False):
+    def __init__(
+        self,
+        dialogue_path: Path,
+        verbose: bool = False,
+        existing_state: Optional[GameState] = None,
+    ):
         self.parser = DialogueParser()
         self.dialogue = self.parser.parse_file(dialogue_path)
-        self.state = GameState()
+        self.dialogue_path = dialogue_path
         self.current_node: Optional[str] = None
         self.verbose = verbose or "--verbose" in sys.argv or "-v" in sys.argv
+
+        # Track if we're continuing from a previous scene
+        self.is_continuation = existing_state is not None
+
+        # Use existing state or create new one
+        if existing_state is not None:
+            self.state = existing_state
+            # Reset visited nodes for the new file
+            self.state.visited_nodes = set()
+        else:
+            self.state = GameState()
 
         # Get terminal width for formatting
         try:
@@ -281,8 +309,11 @@ class DialoguePlayer:
 
         return "\n".join(result)
 
-    def play(self):
-        """Start playing the dialogue"""
+    def play(self) -> Optional[Path]:
+        """
+        Start playing the dialogue.
+        Returns: Path to next file if user chooses to continue, None otherwise.
+        """
         print(f"\n{Colors.BRIGHT_CYAN}{'=' * 70}{Colors.RESET}")
         print(f"{Colors.BRIGHT_YELLOW}{Colors.BOLD}🎭 INTERACTIVE DIALOGUE PLAYER{Colors.RESET}")
         if self.verbose:
@@ -301,9 +332,11 @@ class DialoguePlayer:
         # Execute initial state commands if any
         if self.dialogue.initial_state:
             if self.verbose:
-                print(f"{Colors.BRIGHT_MAGENTA}Executing [state] section commands...{Colors.RESET}")
+                mode = "(skip existing)" if self.is_continuation else "(fresh start)"
+                print(f"{Colors.BRIGHT_MAGENTA}Executing [state] section commands {mode}...{Colors.RESET}")
             for cmd in self.dialogue.initial_state:
-                self.state.execute_command(cmd)
+                # When continuing from a previous scene, don't overwrite existing variables
+                self.state.execute_command(cmd, skip_if_exists=self.is_continuation)
             if self.verbose:
                 print(f"{Colors.BRIGHT_MAGENTA}Initial state set up complete.{Colors.RESET}\n")
 
@@ -328,6 +361,9 @@ class DialoguePlayer:
             print(f"{Colors.BRIGHT_CYAN}{'=' * 70}{Colors.RESET}")
 
         self.show_final_state()
+
+        # Offer to continue to next file
+        return self.prompt_continue()
 
     def play_node(self, node_id: str):
         """Play a single node"""
@@ -541,6 +577,36 @@ class DialoguePlayer:
 
         print("=" * 70)
 
+    def prompt_continue(self) -> Optional[Path]:
+        """
+        Ask user if they want to continue to a new dialogue file.
+        Returns the path to the next file, or None if user doesn't want to continue.
+        """
+        print(f"\n{Colors.BRIGHT_GREEN}{'─' * 50}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}📂 Load New File (Keep State)?{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}{'─' * 50}{Colors.RESET}")
+        print(f"\n  {Colors.CYAN}Your current state will carry over to the new file.{Colors.RESET}\n")
+        print(f"  {Colors.YELLOW}[1]{Colors.RESET} Choose new file")
+        print(f"  {Colors.YELLOW}[2]{Colors.RESET} End session")
+
+        while True:
+            try:
+                choice = input(f"\n{Colors.BRIGHT_MAGENTA}>{Colors.RESET} ").strip().lower()
+
+                if choice in ["2", "q", "quit", "exit", "n", "no"]:
+                    return None
+
+                if choice in ["1", "y", "yes", "c", "continue"]:
+                    # Show file picker
+                    next_file = select_dialogue_file()
+                    return next_file
+
+                print(f"{Colors.RED}❌ Please enter 1 or 2{Colors.RESET}")
+
+            except KeyboardInterrupt:
+                print("\n")
+                return None
+
     def save_game(self):
         """Save current game state"""
         import json
@@ -735,6 +801,7 @@ def select_dialogue_file():
 def main():
     """Main entry point"""
     dialogue_path = None
+    existing_state = None
 
     # Check if file was provided as argument
     if len(sys.argv) >= 2 and not sys.argv[1].startswith("--"):
@@ -747,23 +814,39 @@ def main():
             print(f"{Colors.BRIGHT_YELLOW}👋 Goodbye!{Colors.RESET}")
             sys.exit(0)
 
-    if not dialogue_path.exists():
-        print(f"❌ File not found: {dialogue_path}")
-        sys.exit(1)
+    # Main play loop - supports continuing to next scene with preserved state
+    while dialogue_path is not None:
+        if not dialogue_path.exists():
+            print(f"❌ File not found: {dialogue_path}")
+            sys.exit(1)
 
-    if not dialogue_path.suffix == ".dlg":
-        print("⚠️  Warning: File doesn't have .dlg extension")
+        if not dialogue_path.suffix == ".dlg":
+            print("⚠️  Warning: File doesn't have .dlg extension")
 
-    try:
-        player = DialoguePlayer(dialogue_path)
-        player.play()
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        if "--debug" in sys.argv:
-            import traceback
+        try:
+            player = DialoguePlayer(dialogue_path, existing_state=existing_state)
+            next_file = player.play()
 
-            traceback.print_exc()
-        sys.exit(1)
+            if next_file is not None:
+                # Continue to next file with preserved state
+                print(f"\n{Colors.BRIGHT_GREEN}🔄 Continuing with preserved state...{Colors.RESET}")
+                print(f"{Colors.CYAN}   Variables: {dict(player.state.variables)}{Colors.RESET}")
+                print(f"{Colors.CYAN}   Inventory: {list(player.state.inventory)}{Colors.RESET}")
+                print(f"{Colors.CYAN}   Companions: {list(player.state.companions)}{Colors.RESET}\n")
+                existing_state = player.state
+                dialogue_path = next_file
+            else:
+                dialogue_path = None
+
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            if "--debug" in sys.argv:
+                import traceback
+
+                traceback.print_exc()
+            sys.exit(1)
+
+    print(f"{Colors.BRIGHT_YELLOW}👋 Thanks for playing!{Colors.RESET}")
 
 
 if __name__ == "__main__":

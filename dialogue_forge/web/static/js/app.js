@@ -77,7 +77,7 @@ class GameState {
         }
     }
 
-    executeCommand(command) {
+    executeCommand(command, skipIfExists = false) {
         const parts = command.split(/\s+/);
         if (parts.length === 0) return null;
 
@@ -86,6 +86,13 @@ class GameState {
 
         if (cmd === 'set' && parts.length >= 4) {
             const varName = parts[1];
+
+            // Skip if variable already exists and skipIfExists is true
+            // Used when continuing to a new scene with preserved state
+            if (skipIfExists && varName in this.variables) {
+                return null;
+            }
+
             const value = parts.slice(3).join(' ');
             if (value.toLowerCase() === 'true') {
                 this.variables[varName] = true;
@@ -210,8 +217,13 @@ class DialoguePlayer {
 
             // Initialize state
             if (initialState) {
-                // When playing from a specific node with computed state
+                // When continuing from a previous scene with preserved state
                 this.state = new GameState(initialState);
+                // Execute [state] commands but DON'T overwrite existing variables
+                // This allows new scene-specific variables to be initialized
+                for (const cmd of this.initialStateCommands) {
+                    this.state.executeCommand(cmd, true); // skipIfExists = true
+                }
             } else {
                 // Fresh playthrough - execute [state] commands first
                 this.state = new GameState();
@@ -1111,7 +1123,10 @@ class DialoguePlayer {
                 ${this.state.variables.discord ? `<div class="ending-stat">💀 Discord: ${this.state.variables.discord}</div>` : ''}
                 ${this.state.variables.xp ? `<div class="ending-stat">⭐ XP: ${this.state.variables.xp}</div>` : ''}
             </div>
-            <button class="btn btn-primary play-again-btn">Play Again</button>
+            <div class="ending-buttons">
+                <button class="btn btn-success continue-scene-btn">📂 Load New File (Keep State)</button>
+                <button class="btn btn-primary play-again-btn">🔁 Play Again</button>
+            </div>
         `;
 
         scrollArea.appendChild(endingEl);
@@ -1121,6 +1136,169 @@ class DialoguePlayer {
             this.close();
             this.app.dialoguePlayer.play();
         });
+
+        endingEl.querySelector('.continue-scene-btn').addEventListener('click', () => {
+            this.showContinueModal();
+        });
+    }
+
+    async showContinueModal() {
+        // Capture current state before showing picker
+        const preservedState = {
+            variables: { ...this.state.variables },
+            inventory: [...this.state.inventory],
+            companions: [...this.state.companions]
+        };
+
+        // Create modal overlay
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'continue-modal-overlay';
+        modalOverlay.innerHTML = `
+            <div class="continue-modal">
+                <div class="continue-modal-header">
+                    <h3>📂 Load New File (Keep State)</h3>
+                    <button class="btn-close continue-close">×</button>
+                </div>
+                <div class="continue-modal-body">
+                    <p class="continue-info">Select a dialogue file. Your current state will carry over:</p>
+                    <div class="continue-state-preview">
+                        <div class="state-preview-item">
+                            <strong>Variables:</strong>
+                            <span>${Object.entries(preservedState.variables).map(([k,v]) => `${k}=${v}`).join(', ') || '(none)'}</span>
+                        </div>
+                        <div class="state-preview-item">
+                            <strong>Inventory:</strong>
+                            <span>${preservedState.inventory.join(', ') || '(empty)'}</span>
+                        </div>
+                        <div class="state-preview-item">
+                            <strong>Companions:</strong>
+                            <span>${preservedState.companions.join(', ') || '(none)'}</span>
+                        </div>
+                    </div>
+                    <div class="continue-file-list">
+                        <p class="loading">Loading files...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.modal.appendChild(modalOverlay);
+
+        // Close button handler
+        modalOverlay.querySelector('.continue-close').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+
+        // Backdrop click to close
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        });
+
+        // Fetch available files
+        try {
+            const response = await fetch('/api/dialogues');
+            const data = await response.json();
+
+            const fileListEl = modalOverlay.querySelector('.continue-file-list');
+            fileListEl.innerHTML = '';
+
+            if (!data.files || data.files.length === 0) {
+                fileListEl.innerHTML = '<p class="no-files">No dialogue files found</p>';
+                return;
+            }
+
+            // Group files by category
+            const grouped = {};
+            data.files.forEach(file => {
+                if (!grouped[file.category]) {
+                    grouped[file.category] = [];
+                }
+                grouped[file.category].push(file);
+            });
+
+            // Create file list
+            Object.keys(grouped).sort().forEach(category => {
+                const categoryEl = document.createElement('div');
+                categoryEl.className = 'continue-category';
+                categoryEl.innerHTML = `<div class="continue-category-name">📁 ${category}</div>`;
+
+                grouped[category].forEach(file => {
+                    const fileEl = document.createElement('button');
+                    fileEl.className = 'continue-file-btn';
+                    fileEl.innerHTML = `<span class="file-icon">📄</span> ${file.name}`;
+                    fileEl.dataset.path = file.relative_path;
+
+                    // Highlight current file
+                    if (file.relative_path === this.app.currentFilePath) {
+                        fileEl.classList.add('current-file');
+                        fileEl.innerHTML += ' <span class="current-badge">(current)</span>';
+                    }
+
+                    fileEl.addEventListener('click', async () => {
+                        await this.continueToFile(file.relative_path, preservedState);
+                        modalOverlay.remove();
+                    });
+
+                    categoryEl.appendChild(fileEl);
+                });
+
+                fileListEl.appendChild(categoryEl);
+            });
+
+        } catch (error) {
+            console.error('Failed to load file list:', error);
+            const fileListEl = modalOverlay.querySelector('.continue-file-list');
+            fileListEl.innerHTML = `<p class="error">Failed to load files: ${error.message}</p>`;
+        }
+    }
+
+    async continueToFile(relativePath, preservedState) {
+        // Close current playback modal
+        this.close();
+
+        try {
+            // Load the new file into the editor
+            const response = await fetch(`/api/file/${relativePath}`);
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Update app state (same as loadFile)
+            this.app.editor.setValue(data.content);
+            this.app.currentFile = data;
+            this.app.currentFilePath = relativePath;
+            this.app.originalContent = data.content;
+            this.app.originalLines = data.content.split('\n');
+            this.app.hasUnsavedChanges = false;
+
+            // Clear modified gutter markers
+            this.app.editor.clearGutter('CodeMirror-gutter-modified');
+
+            // Update UI to reflect no unsaved changes
+            this.app.updateUnsavedUI();
+
+            // Update file selector
+            const selector = document.getElementById('file-selector');
+            if (selector) {
+                selector.value = relativePath;
+            }
+
+            // Validate and update graph
+            await this.app.validateDialogue();
+
+            this.app.showNotification(`Loaded: ${data.name}`, 'success');
+
+            // Start playback with preserved state
+            await this.play(null, preservedState, false);
+
+        } catch (error) {
+            console.error('Failed to continue to file:', error);
+            this.app.showNotification(`Failed to load file: ${error.message}`, 'error');
+        }
     }
 
     addMessage(type, message) {

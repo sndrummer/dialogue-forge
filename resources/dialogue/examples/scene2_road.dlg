@@ -1,0 +1,153 @@
+# Scene 2: The Mountain Road
+# This scene's behavior changes based on state from scene 1!
+#
+# State that affects this scene:
+#   - stranger_helped (bool): Did you accept the stranger's help?
+#   - has_item:old_map: Do you have the map he gave you?
+#   - gold (int): How much gold do you have left?
+#   - reputation (int): Your reputation affects NPC reactions
+#   - heard_warning (bool): Did Marta warn you about bandits?
+
+[characters]
+hero: You
+narrator: Narrator
+bandit: Scarred Bandit
+stranger: Cloaked Stranger
+
+[state]
+# This scene expects state from scene 1, but has fallbacks
+# If played standalone, these defaults apply:
+*set gold = 10
+*set reputation = 0
+
+[start]
+narrator: "The mountain road stretches before you. Cold wind bites at your face."
+
+# Different intro based on whether you have the map
+-> has_map_path {has_item:old_map}
+-> no_map_path {!has_item:old_map}
+
+[has_map_path]
+narrator: "You pull out the old map. A hidden trail is marked to the east."
+-> take_hidden_path: "Follow the hidden trail."
+-> ignore_map: "Ignore it and take the main road."
+
+[no_map_path]
+narrator: "You have no guide, only the main road ahead."
+-> continue_main: "Press forward."
+
+[take_hidden_path]
+narrator: "The trail is narrow but quiet. You travel for hours undisturbed."
+narrator: "As dusk falls, you spot a campfire ahead."
+-> approach_camp: "Approach carefully."
+
+[ignore_map]
+narrator: "You pocket the map and continue on the main road."
+-> bandit_encounter
+
+[continue_main]
+narrator: "The road is exposed. After an hour, you hear voices ahead."
+
+# If you heard the warning, you're more cautious
+-> ambush_aware {heard_warning}
+-> ambush_unaware {!heard_warning}
+
+[ambush_aware]
+narrator: "Marta's warning echoes in your mind. You spot movement in the rocks."
+narrator: "Bandits. At least three of them, waiting to spring."
+-> sneak_past: "Try to sneak around."
+-> confront_bandits: "Confront them directly."
+
+[ambush_unaware]
+narrator: "You round a bend and find yourself surrounded."
+-> bandit_encounter
+
+[sneak_past]
+narrator: "You move quietly off the path, circling wide."
+narrator: "The bandits never see you. After an hour, you're past them."
+*add reputation = 1
+-> safe_passage
+
+[confront_bandits]
+narrator: "You step forward boldly."
+-> bandit_encounter
+
+[bandit_encounter]
+bandit: "Well, well. A traveler. Hand over your gold."
+
+# Response options depend on your gold and reputation
+-> pay_toll: "Fine. Here." {gold >= 5}
+-> bluff_poor: "I have nothing!" {gold < 5}
+-> fight_bandits: "You'll have to take it."
+-> reputation_check {reputation >= 2}
+
+[reputation_check]
+narrator: "The bandit squints at you."
+bandit: "Wait... I've heard of you. You're alright."
+bandit: "Go on, then. But don't tell anyone we let you pass."
+*add reputation = 1
+-> safe_passage
+
+[pay_toll]
+*sub gold = 5
+bandit: "Smart choice. Get moving."
+narrator: "They take your coin and let you pass."
+-> safe_passage
+
+[bluff_poor]
+bandit: "Empty pockets, eh? Search 'em, boys."
+narrator: "They find nothing of value and shove you forward."
+bandit: "Worthless. Get out of here."
+-> safe_passage
+
+[fight_bandits]
+narrator: "The fight is brutal but brief."
+*add reputation = 2
+*sub gold = 2
+narrator: "You're wounded, but victorious. You take a few coins from them."
+*add gold = 8
+-> safe_passage
+
+[approach_camp]
+narrator: "You approach the fire. A familiar figure sits there."
+stranger: "I wondered if you'd find the path."
+
+# Different reaction based on whether stranger helped you
+-> reunion_friendly {stranger_helped}
+-> reunion_cold {!stranger_helped}
+
+[reunion_friendly]
+stranger: "Sit. Rest. You've earned it."
+narrator: "He shares his meal with you. The fire is warm."
+stranger: "The pass is just ahead. You'll make it by dawn."
+*add reputation = 2
+-> END: "Thank him and rest."
+
+[reunion_cold]
+stranger: "So you found another way. Resourceful."
+narrator: "He doesn't offer to share his fire."
+stranger: "The pass is ahead. Good luck."
+-> END: "Continue alone."
+
+[safe_passage]
+narrator: "The mountain pass opens before you. You've made it."
+
+# Final summary based on your state
+-> good_ending {reputation >= 3}
+-> neutral_ending {reputation >= 0 && reputation < 3}
+-> bad_ending {reputation < 0}
+
+[good_ending]
+narrator: "Word of your deeds will spread. You've made allies on this journey."
+narrator: "The valley below awaits, full of possibility."
+-> END
+
+[neutral_ending]
+narrator: "You've survived the crossing. That's what matters."
+narrator: "The valley below awaits."
+-> END
+
+[bad_ending]
+narrator: "You've burned bridges along the way."
+narrator: "The valley below awaits, but your reputation precedes you."
+-> END

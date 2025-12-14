@@ -1,0 +1,65 @@
+# Scene 1: The Tavern
+# This scene sets up state that will carry over to scene 2.
+# Try continuing to scene2_road.dlg after finishing!
+
+[characters]
+hero: You
+narrator: Narrator
+barkeep: Old Marta
+stranger: Cloaked Stranger
+
+[state]
+*set gold = 10
+*set reputation = 0
+
+[start]
+narrator: "The Rusty Anchor tavern is warm and dim. A few patrons nurse their drinks."
+barkeep: "Welcome, traveler. What'll it be?"
+-> ask_info: "I'm looking for the mountain pass."
+-> buy_drink: "Ale, please." {gold > 4}
+-> leave_rude: "Nothing. I'm leaving."
+
+[ask_info]
+barkeep: "The mountain pass? Dangerous road, that one. Bandits everywhere."
+*set heard_warning = true
+barkeep: "If you're determined to go, talk to that stranger in the corner. He knows the way."
+-> talk_stranger: "I'll speak with him."
+-> buy_drink: "First, I'll take that ale." {gold > 4}
+
+[buy_drink]
+*sub gold = 5
+*add reputation = 1
+barkeep: "Here you go. Best ale in town."
+narrator: "The drink warms your spirit."
+-> ask_info: "Now, about that mountain pass..." {!heard_warning}
+-> talk_stranger: "Who's that in the corner?" {heard_warning}
+-> talk_stranger: "I should talk to that stranger."
+
+[leave_rude]
+*add reputation = -2
+barkeep: "Hmph. Don't let the door hit you."
+narrator: "You head for the door, but notice a cloaked figure watching you."
+-> talk_stranger: "Wait... who's that?"
+-> END: "Leave anyway."
+
+[talk_stranger]
+narrator: "The stranger looks up as you approach. His eyes are sharp."
+stranger: "You want to cross the mountains. I can see it in you."
+-> accept_help: "Can you help me?"
+-> refuse_help: "I don't need help from strangers."
+
+[accept_help]
+stranger: "Take this. You'll need it on the road."
+*give_item old_map
+*set stranger_helped = true
+*add reputation = 2
+stranger: "The map shows a hidden path. Safer than the main road."
+stranger: "We may meet again, traveler. Stay sharp."
+-> END: "Thank him and leave."
+
+[refuse_help]
+*set stranger_helped = false
+stranger: "Pride. It'll get you killed up there."
+narrator: "He turns away, conversation over."
+-> accept_help: "Wait, I've changed my mind."
+-> END: "Leave the tavern."
