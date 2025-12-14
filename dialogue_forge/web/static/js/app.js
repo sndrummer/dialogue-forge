@@ -1287,6 +1287,9 @@ class DialoguePlayer {
                 selector.value = relativePath;
             }
 
+            // Clear any pending preview timeout (setValue triggers change handler)
+            clearTimeout(this.app.previewTimeout);
+
             // Validate and update graph
             await this.app.validateDialogue();
 
@@ -1921,6 +1924,9 @@ class DialogueForgeApp {
             // Update UI
             this.updateUnsavedUI();
 
+            // Clear any pending preview timeout (setValue triggers change handler)
+            clearTimeout(this.previewTimeout);
+
             // Auto-validate on load
             await this.validateDialogue();
 
@@ -2413,6 +2419,9 @@ Example DLG:
 
             // Update UI
             this.updateUnsavedUI();
+
+            // Clear any pending preview timeout (setValue triggers change handler)
+            clearTimeout(this.previewTimeout);
 
             // Re-validate
             await this.validateDialogue();
