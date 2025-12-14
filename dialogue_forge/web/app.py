@@ -177,8 +177,15 @@ class WebGameState:
             self.variables[match.group(1)] = True
             return
 
-    def execute_command(self, command: str):
-        """Execute a game command"""
+    def execute_command(self, command: str, skip_if_exists: bool = False):
+        """
+        Execute a game command.
+
+        Args:
+            command: The command string to execute
+            skip_if_exists: If True, *set commands won't overwrite existing variables.
+                           Used when continuing to a new scene with preserved state.
+        """
         parts = command.split()
         if not parts:
             return
@@ -187,6 +194,11 @@ class WebGameState:
 
         if cmd == "set" and len(parts) >= 4:
             var_name = parts[1]
+
+            # Skip if variable already exists and skip_if_exists is True
+            if skip_if_exists and var_name in self.variables:
+                return
+
             value = " ".join(parts[3:])
             if value.lower() == "true":
                 self.variables[var_name] = True
