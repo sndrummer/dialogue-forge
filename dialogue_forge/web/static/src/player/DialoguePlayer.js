@@ -15,7 +15,7 @@ export class DialoguePlayer {
         this.state = null;
         this.currentNode = null;
         this.isPlaying = false;
-        this.typewriterSpeed = 25; // ms per character (normal speed)
+        this.typewriterSpeed = 10; // ms per character (fast speed - default)
         this.modal = null;
         this.visitedPath = []; // Track path taken during playback
     }
@@ -231,7 +231,7 @@ export class DialoguePlayer {
                             <span>📊</span> State
                         </button>
                         <button class="btn btn-sm play-speed-btn" title="Toggle text speed">
-                            <span>📝</span> Speed: Normal
+                            <span>⚡</span> Speed: Fast
                         </button>
                         <button class="btn btn-sm btn-close-play" title="Exit playback">
                             ✕
@@ -377,12 +377,21 @@ export class DialoguePlayer {
     }
 
     /**
-     * Check if current node is an exit for the active entry group
+     * Check if current node is an exit node
+     * Either marked in the node data or listed in the active entry group's exits
      */
     isExitNode(nodeId) {
-        if (!this.currentEntryGroup) return false;
-        const entryGroup = this.entries[this.currentEntryGroup];
-        return entryGroup && entryGroup.exits.includes(nodeId);
+        // Check if node is marked as exit in the dialogue data
+        const node = this.dialogueData[nodeId];
+        if (node && node.is_exit_node) return true;
+
+        // Also check if it's an exit for the current entry group
+        if (this.currentEntryGroup) {
+            const entryGroup = this.entries[this.currentEntryGroup];
+            if (entryGroup && entryGroup.exits.includes(nodeId)) return true;
+        }
+
+        return false;
     }
 
     /**
@@ -394,13 +403,29 @@ export class DialoguePlayer {
 
         choicesArea.classList.add('hidden');
 
+        // Find which entry group(s) this node is an exit for
+        const node = this.dialogueData[this.currentNode];
+        let exitForGroups = [];
+        if (node && node.entry_groups) {
+            exitForGroups = node.entry_groups;
+        }
+        // Also check all entries for this node in their exits list
+        for (const [name, group] of Object.entries(this.entries)) {
+            if (group.exits.includes(this.currentNode) && !exitForGroups.includes(name)) {
+                exitForGroups.push(name);
+            }
+        }
+
+        const hasEntryGroup = this.currentEntryGroup || exitForGroups.length > 0;
+        const talkAgainGroup = this.currentEntryGroup || (exitForGroups.length > 0 ? exitForGroups[0] : null);
+
         const exitEl = document.createElement('div');
         exitEl.className = 'dialogue-exit-point';
         exitEl.innerHTML = `
-            <div class="exit-title">⏸️ Conversation Ended</div>
-            <div class="exit-info">You can now explore or talk to other NPCs.</div>
+            <div class="exit-title">💬 Conversation Ended</div>
+            <div class="exit-info">Talk to other NPCs or edit game state to continue.</div>
             <div class="exit-buttons">
-                <button class="btn btn-primary talk-again-btn">💬 Talk Again</button>
+                ${talkAgainGroup ? `<button class="btn btn-primary talk-again-btn">🔄 Talk Again (${talkAgainGroup})</button>` : ''}
                 <button class="btn btn-secondary continue-btn">▶️ Continue Flow</button>
             </div>
         `;
@@ -409,11 +434,12 @@ export class DialoguePlayer {
         scrollArea.scrollTop = scrollArea.scrollHeight;
 
         // Talk again - re-evaluate entry conditions
-        exitEl.querySelector('.talk-again-btn').addEventListener('click', () => {
-            if (this.currentEntryGroup) {
-                this.startFromEntryGroup(this.currentEntryGroup);
-            }
-        });
+        const talkAgainBtn = exitEl.querySelector('.talk-again-btn');
+        if (talkAgainBtn && talkAgainGroup) {
+            talkAgainBtn.addEventListener('click', () => {
+                this.startFromEntryGroup(talkAgainGroup);
+            });
+        }
 
         // Continue flow - proceed with the node's choices as normal
         exitEl.querySelector('.continue-btn').addEventListener('click', async () => {
@@ -779,14 +805,14 @@ export class DialoguePlayer {
     }
 
     toggleSpeed(btn) {
-        if (this.typewriterSpeed === 25) {
-            // Switch to fast
-            this.typewriterSpeed = 5;
-            btn.innerHTML = '<span>⚡</span> Speed: Fast';
-        } else {
+        if (this.typewriterSpeed === 10) {
             // Switch to normal
             this.typewriterSpeed = 25;
             btn.innerHTML = '<span>📝</span> Speed: Normal';
+        } else {
+            // Switch to fast
+            this.typewriterSpeed = 10;
+            btn.innerHTML = '<span>⚡</span> Speed: Fast';
         }
     }
 
