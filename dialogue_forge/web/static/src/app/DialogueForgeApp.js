@@ -1746,7 +1746,7 @@ Example DLG:
             border-radius: 6px;
             font-size: 14px;
             font-weight: 500;
-            z-index: 9999;
+            z-index: 99999;
             animation: slideIn 0.3s ease;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         `;
