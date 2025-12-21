@@ -990,7 +990,7 @@ class DialogueParser:
             for line in node.lines:
                 if line.speaker not in self.dialogue.characters:
                     self.dialogue.warnings.append(
-                        f"Node '{node_id}': Speaker '{line.speaker}' not defined in [characters] section"
+                        f"Line {line.line_number}: Speaker '{line.speaker}' not defined in [characters] section"
                     )
 
         # Validate entry groups
@@ -1021,9 +1021,11 @@ class DialogueParser:
 
         # Check for unreachable nodes (now considering entry points too)
         reachable = self._find_reachable_nodes()
-        for node_id in self.dialogue.nodes:
+        for node_id, node in self.dialogue.nodes.items():
             if node_id not in reachable and node_id != self.dialogue.start_node:
-                self.dialogue.warnings.append(f"Node '{node_id}' is unreachable from start")
+                self.dialogue.warnings.append(
+                    f"Line {node.line_number}: Node '{node_id}' is unreachable from start"
+                )
 
         # Check that there's at least one path to END
         if not self._has_path_to_end():
