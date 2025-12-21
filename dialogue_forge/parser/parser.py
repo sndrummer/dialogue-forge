@@ -96,12 +96,21 @@ class DialogueParser:
     def __init__(self):
         self.dialogue: Dialogue = Dialogue()
         self.current_line_number: int = 0
-        # Track known items and companions for editor convenience
+        # Track known items, companions, and flags for editor convenience
         self.known_items: Set[str] = set()
         self.known_companions: Set[str] = set()
+        self.known_flags: Set[str] = set()  # Boolean flags from conditions
+        self._numeric_vars: Set[str] = set()  # Variables used with add/sub (not boolean)
+
+    # Command keywords that should never be treated as flags
+    COMMAND_KEYWORDS = {
+        "set", "add", "sub", "give_item", "remove_item",
+        "add_companion", "remove_companion", "start_combat",
+        "grant_condition", "remove_condition"
+    }
 
     def _track_items_and_companions(self, text: str):
-        """Extract and track items/companions from commands or conditions"""
+        """Extract and track items/companions/flags from commands or conditions"""
         # Track from commands: *give_item X, *remove_item X, *add_companion X, *remove_companion X
         if text.startswith("give_item ") or text.startswith("remove_item "):
             parts = text.split()
@@ -111,12 +120,71 @@ class DialogueParser:
             parts = text.split()
             if len(parts) >= 2:
                 self.known_companions.add(parts[1])
+        elif text.startswith("add ") or text.startswith("sub "):
+            # Track *add var = N and *sub var = N as numeric (NOT boolean flags)
+            parts = text.split()
+            if len(parts) >= 2:
+                var_name = parts[1]
+                self._numeric_vars.add(var_name)
+                # Remove from flags if it was added there
+                self.known_flags.discard(var_name)
+        elif text.startswith("set "):
+            # Track *set variable = true/false as boolean flags
+            # Format: set var = value
+            match = re.match(r"set\s+(\w+)\s*=\s*(true|false)", text, re.IGNORECASE)
+            if match:
+                var_name = match.group(1)
+                # Only add if not a known numeric var
+                if var_name not in self._numeric_vars:
+                    self.known_flags.add(var_name)
 
         # Track from conditions: has_item:X, companion:X
         for match in re.finditer(r"has_item:(\w+)", text):
             self.known_items.add(match.group(1))
         for match in re.finditer(r"companion:(\w+)", text):
             self.known_companions.add(match.group(1))
+
+        # Track variables in numeric comparisons as NOT boolean
+        for match in re.finditer(r"(\w+)\s*[><=!]=?\s*\d+", text):
+            var_name = match.group(1)
+            self._numeric_vars.add(var_name)
+            self.known_flags.discard(var_name)
+
+        # Track boolean flags from conditions - but be careful!
+        # Only track simple variable checks like {talked_before} or {!equipment_equipped}
+        # NOT items, companions, comparisons, or command keywords
+
+        # First, remove has_item: and companion: patterns so we don't re-match them
+        clean_text = re.sub(r"(has_item|companion):\w+", "", text)
+        # Also remove numeric comparisons
+        clean_text = re.sub(r"\w+\s*[><=!]=?\s*\d+", "", clean_text)
+
+        # Look for simple variable names used as boolean conditions
+        # Pattern: word boundary, optional !, then word, not followed by : or comparison ops
+        for match in re.finditer(r"(?<![:\w])(!?)(\w+)(?![:\w])", clean_text):
+            var_name = match.group(2)
+
+            # Skip command keywords
+            if var_name.lower() in self.COMMAND_KEYWORDS:
+                continue
+            # Skip condition keywords
+            if var_name.lower() in ("true", "false", "and", "or", "not"):
+                continue
+            # Skip numbers
+            if var_name.isdigit():
+                continue
+            # Skip if it's an item we already know about
+            if var_name in self.known_items:
+                continue
+            # Skip if it's a companion we already know about
+            if var_name in self.known_companions:
+                continue
+            # Skip if it's a known numeric variable
+            if var_name in self._numeric_vars:
+                continue
+
+            # This looks like a boolean flag
+            self.known_flags.add(var_name)
 
     def _extract_tags(self, text: str) -> Tuple[str, List[str]]:
         """
@@ -1034,4 +1102,5 @@ class DialogueParser:
             "warnings": len(self.dialogue.warnings),
             "known_items": sorted(list(self.known_items)),
             "known_companions": sorted(list(self.known_companions)),
+            "known_flags": sorted(list(self.known_flags)),
         }

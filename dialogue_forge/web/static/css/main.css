@@ -1155,6 +1155,76 @@ body {
     padding: 8px 16px;
 }
 
+/* Exit section layout */
+.exit-section {
+    margin-bottom: 16px;
+    text-align: left;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.exit-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.exit-npc-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.exit-npc-buttons .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+/* Gameplay simulation section */
+.exit-simulation {
+    border: 1px dashed var(--border-color);
+}
+
+.sim-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.sim-row:last-child {
+    margin-bottom: 0;
+}
+
+.sim-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 50px;
+    padding-top: 4px;
+}
+
+.sim-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+}
+
+.sim-buttons .btn {
+    font-size: 11px;
+    padding: 3px 8px;
+}
+
+.sim-buttons .btn.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
 /* Continue Modal */
 .continue-modal-overlay {
     position: fixed;

@@ -22,6 +22,7 @@ export class DialoguePlayer {
         this.visitedPath = []; // Track path taken during playback
         this.knownItems = []; // Items found in dialogue (give_item, has_item)
         this.knownCompanions = []; // Companions found in dialogue (add_companion, companion:)
+        this.knownFlags = []; // Boolean flags found in dialogue (conditions, *set)
     }
 
     async play(startNode = null, initialState = null, skipPathReset = false) {
@@ -47,6 +48,7 @@ export class DialoguePlayer {
             this.entries = data.entries || {};
             this.knownItems = data.stats?.known_items || [];
             this.knownCompanions = data.stats?.known_companions || [];
+            this.knownFlags = data.stats?.known_flags || [];
             const startNodeId = startNode || data.start_node;
 
             // Convert graph nodes to dialogue format and build trigger map
@@ -480,6 +482,7 @@ export class DialoguePlayer {
 
     /**
      * Show the exit point UI when reaching an exit node (@end)
+     * Includes gameplay simulation options for testing dialogue paths
      */
     async showExitPoint() {
         const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
@@ -487,42 +490,69 @@ export class DialoguePlayer {
 
         choicesArea.classList.add('hidden');
 
-        // Find available triggers to "talk again"
-        // Priority: current trigger > triggers from current node > legacy entry groups
-        const node = this.dialogueData[this.currentNode];
-        let talkAgainTarget = null;
-        let talkAgainType = 'trigger';  // 'trigger' or 'entry'
+        // Get all available NPCs to talk to (from triggers)
+        const talkTargets = Object.keys(this.triggers).filter(target => {
+            return this.triggers[target].some(t => t.type === 'talk');
+        });
 
-        // First check if we have a current trigger
-        if (this.currentTrigger && this.triggers[this.currentTrigger]) {
-            talkAgainTarget = this.currentTrigger;
+        // Build NPC buttons HTML
+        let npcButtonsHtml = '';
+        if (talkTargets.length > 0) {
+            npcButtonsHtml = talkTargets.map(target =>
+                `<button class="btn btn-sm btn-primary npc-talk-btn" data-target="${target}">💬 ${target}</button>`
+            ).join('');
         }
-        // Then check node's triggers
-        else if (node && node.triggers && node.triggers.length > 0) {
-            talkAgainTarget = node.triggers[0].target;
+
+        // Build items buttons HTML - ALL known items, toggleable
+        let itemsButtonsHtml = '';
+        if (this.knownItems.length > 0) {
+            itemsButtonsHtml = this.knownItems.map(item => {
+                const hasItem = this.state.inventory.has(item);
+                const activeClass = hasItem ? 'active' : '';
+                const icon = hasItem ? '✓' : '+';
+                return `<button class="btn btn-xs btn-outline sim-item-btn ${activeClass}" data-item="${item}">${icon} ${item}</button>`;
+            }).join('');
         }
-        // Legacy: check entry groups
-        else if (this.currentEntryGroup) {
-            talkAgainTarget = this.currentEntryGroup;
-            talkAgainType = 'entry';
-        } else {
-            // Check all entries for this node
-            for (const [name, group] of Object.entries(this.entries)) {
-                if (group.exits.includes(this.currentNode)) {
-                    talkAgainTarget = name;
-                    talkAgainType = 'entry';
-                    break;
-                }
-            }
+
+        // Build flags buttons HTML - ALL known flags, toggleable
+        let flagsButtonsHtml = '';
+        if (this.knownFlags.length > 0) {
+            flagsButtonsHtml = this.knownFlags.map(flag => {
+                const isSet = this.state.variables[flag] === true;
+                const activeClass = isSet ? 'active' : '';
+                const icon = isSet ? '✓' : '○';
+                return `<button class="btn btn-xs btn-outline sim-flag-btn ${activeClass}" data-flag="${flag}">${icon} ${flag}</button>`;
+            }).join('');
         }
 
         const exitEl = document.createElement('div');
         exitEl.className = 'dialogue-exit-point';
         exitEl.innerHTML = `
             <div class="exit-title">💬 Conversation Ended</div>
-            <div class="exit-info">Talk to other NPCs or edit game state to continue.</div>
+            ${talkTargets.length > 0 ? `
+                <div class="exit-section">
+                    <div class="exit-section-label">Talk to:</div>
+                    <div class="exit-npc-buttons">${npcButtonsHtml}</div>
+                </div>
+            ` : ''}
+            ${(this.knownItems.length > 0 || this.knownFlags.length > 0) ? `
+                <div class="exit-section exit-simulation">
+                    <div class="exit-section-label">🎮 Simulate Gameplay:</div>
+                    ${this.knownItems.length > 0 ? `
+                        <div class="sim-row">
+                            <span class="sim-label">Items:</span>
+                            <div class="sim-buttons">${itemsButtonsHtml}</div>
+                        </div>
+                    ` : ''}
+                    ${this.knownFlags.length > 0 ? `
+                        <div class="sim-row">
+                            <span class="sim-label">Flags:</span>
+                            <div class="sim-buttons">${flagsButtonsHtml}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
             <div class="exit-buttons">
-                ${talkAgainTarget ? `<button class="btn btn-primary talk-again-btn">🔄 Talk Again (${talkAgainTarget})</button>` : ''}
                 <button class="btn btn-secondary continue-btn">▶️ Continue Flow</button>
             </div>
         `;
@@ -530,17 +560,55 @@ export class DialoguePlayer {
         scrollArea.appendChild(exitEl);
         scrollArea.scrollTop = scrollArea.scrollHeight;
 
-        // Talk again - re-evaluate trigger/entry conditions
-        const talkAgainBtn = exitEl.querySelector('.talk-again-btn');
-        if (talkAgainBtn && talkAgainTarget) {
-            talkAgainBtn.addEventListener('click', () => {
-                if (talkAgainType === 'trigger') {
-                    this.startFromTrigger(talkAgainTarget);
-                } else {
-                    this.startFromEntryGroup(talkAgainTarget);
-                }
+        // NPC talk buttons
+        exitEl.querySelectorAll('.npc-talk-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.target;
+                this.startFromTrigger(target);
             });
-        }
+        });
+
+        // Item simulation buttons - toggleable
+        exitEl.querySelectorAll('.sim-item-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const item = btn.dataset.item;
+                if (this.state.inventory.has(item)) {
+                    // Remove item
+                    this.state.inventory.delete(item);
+                    btn.classList.remove('active');
+                    btn.textContent = `+ ${item}`;
+                    this.app.showNotification(`🎒 Removed: ${item}`, 'info');
+                } else {
+                    // Add item
+                    this.state.inventory.add(item);
+                    btn.classList.add('active');
+                    btn.textContent = `✓ ${item}`;
+                    this.app.showNotification(`🎒 Added: ${item}`, 'success');
+                }
+                this.updateStatsDisplay();
+            });
+        });
+
+        // Flag simulation buttons - toggleable
+        exitEl.querySelectorAll('.sim-flag-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const flag = btn.dataset.flag;
+                if (this.state.variables[flag] === true) {
+                    // Unset flag
+                    this.state.variables[flag] = false;
+                    btn.classList.remove('active');
+                    btn.textContent = `○ ${flag}`;
+                    this.app.showNotification(`🚩 Set: ${flag} = false`, 'info');
+                } else {
+                    // Set flag
+                    this.state.variables[flag] = true;
+                    btn.classList.add('active');
+                    btn.textContent = `✓ ${flag}`;
+                    this.app.showNotification(`🚩 Set: ${flag} = true`, 'success');
+                }
+                this.updateStatsDisplay();
+            });
+        });
 
         // Continue flow - proceed with the node's choices as normal
         exitEl.querySelector('.continue-btn').addEventListener('click', async () => {

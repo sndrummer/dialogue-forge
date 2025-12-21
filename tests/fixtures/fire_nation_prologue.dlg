@@ -183,102 +183,63 @@ officer: "Keep those thoughts to yourself, recruit. The Fire Lord's orders are a
 -> exploration_phase
 
 [exploration_phase]
+@event:exploration_start
+*set exploration_started = true
 narrator: "You can explore the area, speak to Fire Nation soldiers, and search for collectibles."
-# Player can find: Quail-pig, Berries, Airbender Trap
--> talk_recruit_1: "[Talk to a recruit about the invasion]"
--> talk_recruit_2: "[Ask a recruit about the Airbenders]"
--> talk_recruit_3: "[Talk to a recruit about supplies]"
--> find_berries: "[Search for berries]" {!picked_berries}
--> find_quailpig: "[Follow animal tracks]" {!roasted_pig}
--> find_trap: "[Scout the northern path]" {!trap_disarmed}
--> report_back: "[Report to the officer]"
+# GAMEPLAY: Player physically explores to find berries, quail-pig, trap
+# GAMEPLAY: Player walks to recruits to talk, walks to officer to report
+@end
 
 # ==========================================
-# NPC INTERACTIONS
+# NPC INTERACTIONS (Talk to recruits during exploration)
 # ==========================================
 
 [talk_recruit_1]
--> ask_recruit_1: "Hey, pal! How're you feeling about the invasion?"
-
-[ask_recruit_1]
+@talk:recruit {exploration_started}
 recruit: "Can't wait to show what I've got! You feel that power from the comet? I've never bent flames this hot before!"
--> exploration_phase
+@end
 
 [talk_recruit_2]
--> ask_recruit_2: "Why are we attacking the Airbenders? Aren't they peaceful?"
-
-[ask_recruit_2]
-recruit: "Peaceful? Wake up! The Avatar comes from the Air Nomads - the most
+@talk:recruit2 {exploration_started}
+recruit2: "Peaceful? Wake up! The Avatar comes from the Air Nomads - the most
     powerful bender in the world, and they've been hiding him. The Fire Lord
     says if we don't wipe them out now, the Avatar will grow up to destroy
     everything we've built. We're not just following orders - we're preventing
     the end of our civilization."
--> exploration_phase
+@end
 
 [talk_recruit_3]
--> ask_recruit_3: "Where should I look for enemies or food?"
-
-[ask_recruit_3]
+@talk:recruit {exploration_started && !got_tips}
+*set got_tips = true
 recruit: "Check the bushes for quail-pig tracks - they nest in the scrub. And
     watch the ridgeline, that's where I'd set an ambush if I were them.
     Flameo, hotman!"
--> exploration_phase
+@end
 
 # ==========================================
-# EXPLORATION DISCOVERIES
+# EXPLORATION DISCOVERIES (Triggered by GAMEPLAY, not dialogue)
+# In Godot: Player finds object → interaction sets flags/gives items
+# In Web GUI: Use "Simulate Gameplay" to set flags/give items
 # ==========================================
 
-[find_berries]
-narrator: "You find a bush heavy with mountain berries. These could serve as emergency rations if needed."
--> pick_berries: "[Pick berries]"
--> leave_berries: "[Leave the bush alone]"
+# When player interacts with berry bush in-game:
+# *give_item berries
+# *set picked_berries = true
 
-[pick_berries]
-*give_item berries
-*set picked_berries = true
-narrator: "Berries added to inventory."
--> exploration_phase
+# When player interacts with quail-pig in-game:
+# Option A: *give_item roasted_quail_pig, *set roasted_pig = true, *add discord = 1
+# Option B: spare it (no changes)
 
-[leave_berries]
--> exploration_phase
-
-[find_quailpig]
-narrator: "You find a quail-pig in the bushes, shivering with fear when it spots you. What do you do?"
--> roast_pig: "[Roast the pig]"
--> spare_pig: "[Leave the pig alone]"
-
-[roast_pig]
-*give_item roasted_quail_pig
-*set roasted_pig = true
-*add discord = 1
-narrator: "You roast the quail-pig with your firebending. The smell of cooked meat fills the air."
--> exploration_phase
-
-[spare_pig]
--> exploration_phase
-
-[find_trap]
-narrator: "You discover thin air channels carved into the rock face, connected by
-    rope triggers. An airbender trap - one gust of wind through these channels
-    would trigger a rockslide."
--> disarm_trap: "[Disarm the trap]"
--> leave_trap: "[Leave the trap intact]"
-
-[disarm_trap]
-*set trap_disarmed = true
-narrator: "You carefully disarm the trap, ensuring safe passage for the battalion."
--> exploration_phase
-
-[leave_trap]
-*set trap_active = true
-narrator: "You decide to leave the trap as it is."
--> exploration_phase
+# When player interacts with trap in-game:
+# Option A: *set trap_disarmed = true
+# Option B: *set trap_active = true
 
 # ==========================================
-# REPORTING BACK
+# REPORTING BACK (Talk to officer during exploration)
 # ==========================================
 
 [report_back]
+@talk:officer {exploration_started}
 officer: "Yes? Have you found something?"
 -> not_yet: "Not yet, sir!"
 -> report_trap: "Yes, sir. I found and disarmed a trap near the mountain path." {trap_disarmed}
@@ -288,7 +249,7 @@ officer: "Yes? Have you found something?"
 
 [not_yet]
 officer: "Then why are you wasting my time? The comet won't burn forever! Move!"
--> exploration_phase
+@end
 
 [report_trap]
 *add harmony = 1
