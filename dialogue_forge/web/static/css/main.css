@@ -2193,6 +2193,21 @@ body {
     border-bottom: 1px solid #f59e0b;
 }
 
+/* Validation line links */
+.validation-line-link {
+    color: #60a5fa;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.validation-line-link:hover {
+    color: #93c5fd;
+    text-decoration-style: solid;
+}
+
 /* Utility classes */
 .hidden {
     display: none !important;

@@ -192,6 +192,13 @@ export class DialogueForgeApp {
         // Add syntax highlighting for .dlg format
         this.setupDLGSyntaxHighlighting();
 
+        // Define vim :w command for saving
+        if (CodeMirror.Vim) {
+            CodeMirror.Vim.defineEx('write', 'w', () => {
+                this.handleSave();
+            });
+        }
+
         // Track changes for modified lines and unsaved state
         this.editor.on('change', (cm, change) => {
             // Update gutter markers by comparing with original
@@ -1313,6 +1320,20 @@ Example DLG:
         layout.run();
     }
 
+    /**
+     * Format a validation message, extracting line numbers and making them clickable
+     */
+    formatValidationMessage(message) {
+        // Pattern: "Line X:" or "Line X," at the start of the message
+        const lineMatch = message.match(/^Line\s+(\d+)[:\s,]/i);
+        if (lineMatch) {
+            const lineNum = parseInt(lineMatch[1], 10);
+            const restOfMessage = message.substring(lineMatch[0].length).trim();
+            return `<span class="validation-line-link" data-line="${lineNum}">Line ${lineNum}</span>: ${escapeHtml(restOfMessage)}`;
+        }
+        return escapeHtml(message);
+    }
+
     showValidationResults(data) {
         const panel = document.getElementById('validation-panel');
         const content = document.getElementById('validation-content');
@@ -1338,7 +1359,7 @@ Example DLG:
                 data.warnings.forEach(warning => {
                     html += `<div class="validation-warning">
                         <div class="validation-warning-title">⚠️ Warning</div>
-                        <div>${escapeHtml(warning)}</div>
+                        <div>${this.formatValidationMessage(warning)}</div>
                     </div>`;
                 });
             }
@@ -1354,7 +1375,7 @@ Example DLG:
                 data.errors.forEach(error => {
                     html += `<div class="validation-error">
                         <div class="validation-error-title">❌ Error</div>
-                        <div>${escapeHtml(error)}</div>
+                        <div>${this.formatValidationMessage(error)}</div>
                     </div>`;
                 });
             }
@@ -1363,13 +1384,25 @@ Example DLG:
                 data.warnings.forEach(warning => {
                     html += `<div class="validation-warning">
                         <div class="validation-warning-title">⚠️ Warning</div>
-                        <div>${escapeHtml(warning)}</div>
+                        <div>${this.formatValidationMessage(warning)}</div>
                     </div>`;
                 });
             }
 
             content.innerHTML = html || '<p class="validation-empty">Unknown error occurred</p>';
         }
+
+        // Add click handlers for line number links
+        content.querySelectorAll('.validation-line-link').forEach(link => {
+            link.addEventListener('click', () => {
+                const lineNum = parseInt(link.dataset.line, 10);
+                // Jump to line in editor (0-indexed)
+                this.editor.setCursor({ line: lineNum - 1, ch: 0 });
+                this.editor.focus();
+                // Scroll the line into view
+                this.editor.scrollIntoView({ line: lineNum - 1, ch: 0 }, 100);
+            });
+        });
     }
 
     showNodeInspector(nodeData) {
