@@ -196,11 +196,17 @@ narrator: "You can explore the area, speak to Fire Nation soldiers, and search f
 
 [talk_recruit_1]
 @talk:recruit {exploration_started}
+-> ask_recruit_1: "Hey, pal! How're you feeling about the invasion?"
+
+[ask_recruit_1]
 recruit: "Can't wait to show what I've got! You feel that power from the comet? I've never bent flames this hot before!"
 @end
 
 [talk_recruit_2]
 @talk:recruit2 {exploration_started}
+-> ask_recruit_2: "Why are we attacking the Airbenders? Aren't they peaceful?"
+
+[ask_recruit_2]
 recruit2: "Peaceful? Wake up! The Avatar comes from the Air Nomads - the most
     powerful bender in the world, and they've been hiding him. The Fire Lord
     says if we don't wipe them out now, the Avatar will grow up to destroy
@@ -209,8 +215,10 @@ recruit2: "Peaceful? Wake up! The Avatar comes from the Air Nomads - the most
 @end
 
 [talk_recruit_3]
-@talk:recruit {exploration_started && !got_tips}
-*set got_tips = true
+@talk:recruit {exploration_started}
+-> ask_recruit_3: "Where should I look for enemies or food?"
+
+[ask_recruit_3]
 recruit: "Check the bushes for quail-pig tracks - they nest in the scrub. And
     watch the ridgeline, that's where I'd set an ambush if I were them.
     Flameo, hotman!"
