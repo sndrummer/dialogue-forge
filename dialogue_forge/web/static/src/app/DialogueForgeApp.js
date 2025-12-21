@@ -1215,6 +1215,9 @@ Example DLG:
     }
 
     async validateDialogue() {
+        // Clear any existing notifications before showing new validation results
+        this.clearNotifications();
+
         const content = this.editor.getValue();
 
         try {
@@ -1734,10 +1737,17 @@ Example DLG:
         });
     }
 
+    clearNotifications() {
+        // Remove all existing toast notifications
+        document.querySelectorAll('.dlg-toast').forEach(toast => {
+            toast.remove();
+        });
+    }
+
     showNotification(message, type = 'info') {
         // Create toast notification
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        toast.className = `dlg-toast toast toast-${type}`;
         toast.style.cssText = `
             position: fixed;
             bottom: 20px;
