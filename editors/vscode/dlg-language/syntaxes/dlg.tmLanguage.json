@@ -4,9 +4,12 @@
   "scopeName": "source.dlg",
   "patterns": [
     { "include": "#comment" },
+    { "include": "#entry-node" },
     { "include": "#special-node" },
     { "include": "#node" },
     { "include": "#command" },
+    { "include": "#exit-marker" },
+    { "include": "#entry-route" },
     { "include": "#choice" },
     { "include": "#speaker-line" },
     { "include": "#end-keyword" }
@@ -15,6 +18,37 @@
     "comment": {
       "name": "comment.line.number-sign.dlg",
       "match": "^\\s*#.*$"
+    },
+    "entry-node": {
+      "name": "keyword.control.entry.dlg",
+      "match": "^\\s*\\[entry:\\w+\\]"
+    },
+    "exit-marker": {
+      "begin": "^\\s*(<-)\\s*",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.exit.dlg" }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "name": "entity.name.function.exit-target.dlg",
+          "match": "\\b\\w+\\b"
+        }
+      ]
+    },
+    "entry-route": {
+      "begin": "^\\s*([\\w!<>=&|\\s]+)(->)\\s*",
+      "beginCaptures": {
+        "1": { "name": "meta.condition.inline.dlg" },
+        "2": { "name": "keyword.control.route.dlg" }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "name": "entity.name.function.route-target.dlg",
+          "match": "\\b\\w+\\b"
+        }
+      ]
     },
     "special-node": {
       "name": "keyword.control.section.dlg",

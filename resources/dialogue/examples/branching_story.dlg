@@ -13,6 +13,45 @@ prisoner: Mysterious Prisoner
 *set freed_prisoner = false
 *set gold = 50
 
+# ==========================================
+# ENTRY GROUPS
+# ==========================================
+
+# Guard at the castle gate
+[entry:guard]
+# If already have permission, go straight to castle
+has_permission -> enter_castle
+# If bribed before but didn't enter, resume at castle entrance
+bribed_guard -> enter_castle
+# Default - start at the gate
+-> start
+
+# Exit point - player can explore the castle
+<- enter_castle
+
+# King in the throne room
+[entry:king]
+# If freed prisoner, confront with truth
+freed_prisoner -> throne_room
+# If reported prisoner, different reaction
+reported_prisoner -> throne_room
+# Default
+-> throne_room
+
+# Exits - endings
+<- good_ending
+<- neutral_ending
+<- bad_ending
+
+# Prisoner in the dungeon
+[entry:prisoner]
+# If already freed, they're gone
+freed_prisoner -> prisoner_gone
+# Default
+-> dungeon
+
+<- dungeon
+
 [start]
 guard: "Halt! No one enters the castle without permission."
 -> talk_guard: "I need to see the King."
@@ -57,6 +96,10 @@ hero: "The castle is grand but eerily quiet."
 [dungeon_risky]
 hero: "I shouldn't push my luck... but I'm curious."
 -> dungeon
+
+[prisoner_gone]
+hero: "The cell is empty. The prisoner has escaped."
+-> enter_castle
 
 [dungeon]
 prisoner: "Please... help me. I've been falsely imprisoned."

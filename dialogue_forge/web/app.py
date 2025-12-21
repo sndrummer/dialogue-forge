@@ -593,6 +593,20 @@ def create_app(dialogues_root=None):
             # Track if we need an END node
             has_end_target = False
 
+            # Collect all entry targets and exit nodes for marking
+            entry_targets = set()
+            exit_nodes = set()
+            entry_groups_for_node = {}  # node_id -> list of entry group names that target it
+
+            for entry_name, entry_group in dialogue.entries.items():
+                for route in entry_group.routes:
+                    entry_targets.add(route.target)
+                    if route.target not in entry_groups_for_node:
+                        entry_groups_for_node[route.target] = []
+                    entry_groups_for_node[route.target].append(entry_name)
+                for exit_node in entry_group.exits:
+                    exit_nodes.add(exit_node)
+
             # Create nodes for each dialogue node
             for node_id, node in dialogue.nodes.items():
                 # Count dialogue lines and commands for node size
@@ -603,6 +617,9 @@ def create_app(dialogues_root=None):
                     "choices_count": len(node.choices),
                     "commands_count": len(node.commands),
                     "is_start": node_id == dialogue.start_node,
+                    "is_entry_target": node_id in entry_targets,
+                    "is_exit_node": node_id in exit_nodes,
+                    "entry_groups": entry_groups_for_node.get(node_id, []),
                     "lines": [
                         {
                             "speaker": line.speaker,
@@ -650,6 +667,17 @@ def create_app(dialogues_root=None):
                     }
                 )
 
+            # Convert entry groups to JSON-serializable format
+            entries_info = {}
+            for entry_name, entry_group in dialogue.entries.items():
+                entries_info[entry_name] = {
+                    "routes": [
+                        {"condition": route.condition, "target": route.target}
+                        for route in entry_group.routes
+                    ],
+                    "exits": entry_group.exits,
+                }
+
             return jsonify(
                 {
                     "valid": is_valid,
@@ -658,6 +686,7 @@ def create_app(dialogues_root=None):
                     "characters": characters_info,
                     "start_node": dialogue.start_node,
                     "initial_state": dialogue.initial_state,
+                    "entries": entries_info,
                     "graph": {"nodes": nodes, "edges": edges},
                     "stats": parser.get_stats(),
                 }
@@ -713,13 +742,24 @@ def create_app(dialogues_root=None):
             lines = content.split("\n")
             dialogue = parser.parse_lines(lines)
 
-            # Convert to JSON format (same as export_json.py)
+            # Convert to JSON format (same as export_cmd.py)
             json_data = {
                 "characters": dialogue.characters,
                 "start_node": dialogue.start_node,
                 "initial_state": dialogue.initial_state,
+                "entries": {},
                 "nodes": {},
             }
+
+            # Convert entry groups
+            for entry_name, entry_group in dialogue.entries.items():
+                json_data["entries"][entry_name] = {
+                    "routes": [
+                        {"condition": route.condition, "target": route.target}
+                        for route in entry_group.routes
+                    ],
+                    "exits": entry_group.exits,
+                }
 
             for node_id, node in dialogue.nodes.items():
                 json_data["nodes"][node_id] = {

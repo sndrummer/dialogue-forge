@@ -458,6 +458,32 @@ export class DialogueForgeApp {
                         'target-arrow-color': '#8b5cf6'
                     }
                 },
+                // Entry/Exit node styles
+                {
+                    selector: 'node[is_entry_target]',
+                    style: {
+                        'border-color': '#22c55e',
+                        'border-width': 3,
+                        'border-style': 'double'
+                    }
+                },
+                {
+                    selector: 'node[is_exit_node]',
+                    style: {
+                        'border-color': '#eab308',
+                        'border-width': 3,
+                        'border-style': 'dashed'
+                    }
+                },
+                // Nodes that are both entry and exit
+                {
+                    selector: 'node[is_entry_target][is_exit_node]',
+                    style: {
+                        'border-color': '#06b6d4',
+                        'border-width': 4,
+                        'border-style': 'double'
+                    }
+                },
                 // Path highlighting styles
                 {
                     selector: 'node.path-visited',

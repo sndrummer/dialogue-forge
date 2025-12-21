@@ -9,6 +9,25 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
+class EntryRoute:
+    """Represents a conditional entry route within an entry group"""
+
+    condition: Optional[str]  # None means default (always matches)
+    target: str
+    line_number: int = 0
+
+
+@dataclass
+class EntryGroup:
+    """Represents a named entry group with routes and exits"""
+
+    name: str
+    routes: List[EntryRoute] = field(default_factory=list)
+    exits: List[str] = field(default_factory=list)  # Node names that end this conversation
+    line_number: int = 0
+
+
+@dataclass
 class Choice:
     """Represents a dialogue choice"""
 
@@ -46,6 +65,7 @@ class Dialogue:
 
     characters: Dict[str, str] = field(default_factory=dict)  # id -> display name
     nodes: Dict[str, DialogueNode] = field(default_factory=dict)
+    entries: Dict[str, EntryGroup] = field(default_factory=dict)  # name -> entry group
     start_node: Optional[str] = None
     initial_state: List[str] = field(default_factory=list)  # Commands to execute before dialogue starts
     errors: List[str] = field(default_factory=list)
@@ -351,6 +371,13 @@ class DialogueParser:
                 i = self._parse_state(lines, i + 1)
                 continue
 
+            # Parse entry group section [entry:name]
+            entry_match = re.match(r"\[entry:(\w+)\]", line.strip())
+            if entry_match:
+                entry_name = entry_match.group(1)
+                i = self._parse_entry_group(lines, i + 1, entry_name, i + 1)
+                continue
+
             # Parse dialogue node(s) - can have multiple stacked labels
             if line.strip().startswith("[") and line.strip().endswith("]"):
                 node_ids = [line.strip()[1:-1]]
@@ -430,6 +457,99 @@ class DialogueParser:
 
             i += 1
 
+        return i
+
+    def _parse_entry_group(
+        self, lines: List[str], start_index: int, entry_name: str, definition_line: int
+    ) -> int:
+        """Parse an entry group section [entry:name]
+
+        Entry groups define conditional entry points and exit nodes for a conversation.
+
+        Syntax:
+            [entry:officer]
+            # Entry routes - condition -> target (first match wins)
+            equipment_equipped -> equip_items
+            talked_before && !has_sword -> reminder
+            -> start
+
+            # Exit markers - conversation ends at these nodes
+            <- equip_items
+            <- ship_deck
+        """
+        entry_group = EntryGroup(name=entry_name, line_number=definition_line)
+        i = start_index
+
+        while i < len(lines):
+            line = lines[i].strip()
+
+            # Stop at next section (any [...] header)
+            if line.startswith("[") and line.endswith("]"):
+                break
+
+            # Skip empty lines and comments
+            if not line or line.startswith("#"):
+                i += 1
+                continue
+
+            # Parse exit marker: <- node_name
+            if line.startswith("<-"):
+                exit_target = line[2:].strip()
+                if exit_target:
+                    entry_group.exits.append(exit_target)
+                else:
+                    self.dialogue.warnings.append(
+                        f"Line {i + 1}: Empty exit marker '<-' in [entry:{entry_name}]"
+                    )
+                i += 1
+                continue
+
+            # Parse entry route: condition -> target OR -> target (default)
+            if "->" in line:
+                arrow_pos = line.index("->")
+                condition_part = line[:arrow_pos].strip()
+                target = line[arrow_pos + 2 :].strip()
+
+                if not target:
+                    self.dialogue.warnings.append(
+                        f"Line {i + 1}: Empty target in entry route in [entry:{entry_name}]"
+                    )
+                    i += 1
+                    continue
+
+                # Empty condition means default route
+                condition = condition_part if condition_part else None
+
+                # Validate condition syntax if present
+                if condition:
+                    condition_warnings = self.validate_condition_syntax(condition, i + 1)
+                    self.dialogue.warnings.extend(condition_warnings)
+
+                route = EntryRoute(condition=condition, target=target, line_number=i + 1)
+                entry_group.routes.append(route)
+                i += 1
+                continue
+
+            # Unexpected content
+            self.dialogue.warnings.append(
+                f"Line {i + 1}: Unexpected content in [entry:{entry_name}]: '{line}'. "
+                f"Expected 'condition -> target', '-> target', or '<- exit_node'."
+            )
+            i += 1
+
+        # Validate entry group has at least one route
+        if not entry_group.routes:
+            self.dialogue.warnings.append(
+                f"[entry:{entry_name}] has no entry routes defined"
+            )
+
+        # Check for duplicate entry group names
+        if entry_name in self.dialogue.entries:
+            self.dialogue.warnings.append(
+                f"Line {definition_line}: Duplicate entry group name '{entry_name}'"
+            )
+
+        self.dialogue.entries[entry_name] = entry_group
         return i
 
     def _parse_node(self, lines: List[str], start_index: int, node_ids: List[str]) -> int:
@@ -694,7 +814,33 @@ class DialogueParser:
                         f"Node '{node_id}': Speaker '{line.speaker}' not defined in [characters] section"
                     )
 
-        # Check for unreachable nodes
+        # Validate entry groups
+        for entry_name, entry_group in self.dialogue.entries.items():
+            # Check entry route targets exist
+            for route in entry_group.routes:
+                if route.target not in self.dialogue.nodes:
+                    self.dialogue.errors.append(
+                        f"Line {route.line_number}: Entry route target '{route.target}' "
+                        f"in [entry:{entry_name}] does not exist"
+                    )
+                    valid = False
+
+            # Check exit nodes exist
+            for exit_node in entry_group.exits:
+                if exit_node not in self.dialogue.nodes:
+                    self.dialogue.warnings.append(
+                        f"[entry:{entry_name}]: Exit node '{exit_node}' does not exist"
+                    )
+
+            # Warn if entry group has no default route (no unconditional route)
+            has_default = any(route.condition is None for route in entry_group.routes)
+            if not has_default:
+                self.dialogue.warnings.append(
+                    f"[entry:{entry_name}] has no default entry route (-> target). "
+                    f"Conversation may not start if no conditions match."
+                )
+
+        # Check for unreachable nodes (now considering entry points too)
         reachable = self._find_reachable_nodes()
         for node_id in self.dialogue.nodes:
             if node_id not in reachable and node_id != self.dialogue.start_node:
@@ -707,12 +853,19 @@ class DialogueParser:
         return valid and len(self.dialogue.errors) == 0
 
     def _find_reachable_nodes(self) -> Set[str]:
-        """Find all nodes reachable from the start node"""
-        if not self.dialogue.start_node:
-            return set()
-
+        """Find all nodes reachable from start node and entry group targets"""
         visited = set()
-        to_visit = [self.dialogue.start_node]
+        to_visit = []
+
+        # Add start node as a starting point
+        if self.dialogue.start_node:
+            to_visit.append(self.dialogue.start_node)
+
+        # Add all entry group targets as starting points
+        for entry_group in self.dialogue.entries.values():
+            for route in entry_group.routes:
+                if route.target not in to_visit:
+                    to_visit.append(route.target)
 
         while to_visit:
             current = to_visit.pop(0)
@@ -742,10 +895,15 @@ class DialogueParser:
         total_lines = sum(len(node.lines) for node in self.dialogue.nodes.values())
         total_choices = sum(len(node.choices) for node in self.dialogue.nodes.values())
         total_commands = sum(len(node.commands) for node in self.dialogue.nodes.values())
+        total_entry_routes = sum(len(e.routes) for e in self.dialogue.entries.values())
+        total_exits = sum(len(e.exits) for e in self.dialogue.entries.values())
 
         return {
             "characters": len(self.dialogue.characters),
             "nodes": len(self.dialogue.nodes),
+            "entry_groups": len(self.dialogue.entries),
+            "entry_routes": total_entry_routes,
+            "exit_nodes": total_exits,
             "dialogue_lines": total_lines,
             "choices": total_choices,
             "commands": total_commands,

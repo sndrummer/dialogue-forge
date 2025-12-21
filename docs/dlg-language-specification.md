@@ -17,6 +17,12 @@ speaker: "Text" [tag] {condition}    # Tags + condition
 *set flag = true                     # Set variable
 *add karma = 10                      # Modify number
 -> END                               # End conversation
+
+# Entry Groups (NPC conversation routing)
+[entry:officer]                      # Define entry group
+condition -> target                  # Conditional entry
+-> start                             # Default entry
+<- exit_node                         # Exit marker
 ```
 
 ---
@@ -358,31 +364,186 @@ narrator: "The boy's fate is sealed."
 
 ---
 
-## 10. Best Practices
+## 10. Entry Groups
 
-### 10.1 Node Naming
+Entry groups define how NPCs start conversations based on game state. They specify conditional entry points and exit nodes for each NPC.
+
+### 10.1 Basic Entry Group
+
+```
+[entry:officer]
+equipment_equipped -> equip_items
+talked_before -> get_equipment
+-> start
+
+<- equip_items
+<- ship_deck
+```
+
+### 10.2 Syntax Reference
+
+| Syntax | Meaning |
+|--------|---------|
+| `[entry:name]` | Define entry group for NPC `name` |
+| `condition -> target` | If condition true, start at target |
+| `-> target` | Default entry (no condition) |
+| `<- node` | Exit marker (conversation pauses here) |
+
+### 10.3 Entry Routes
+
+Entry routes are evaluated **top-to-bottom**, first match wins:
+
+```
+[entry:merchant]
+is_vip && gold > 1000 -> vip_greeting
+reputation > 50 -> friendly_greeting
+has_item:stolen_goods -> suspicious_greeting
+-> default_greeting
+```
+
+- Routes use the same condition syntax as choices
+- The last route should typically have no condition (default)
+- If no routes match, the conversation may not start
+
+### 10.4 Exit Nodes
+
+Exit nodes mark where a conversation **pauses** (not ends). When the player reaches an exit node, they can walk around and return to talk again.
+
+```
+[entry:guard]
+-> patrol_start
+<- patrol_complete
+<- guard_dismissed
+```
+
+**Exit vs END:**
+- `<- node` — Conversation pauses, player can move around
+- `-> END` — Dialogue terminates completely
+
+### 10.5 Multiple Entry Groups
+
+A single dialogue file can have multiple entry groups for different NPCs:
+
+```
+[characters]
+officer: Fire Nation Officer
+recruit: Fire Nation Recruit
+
+[entry:officer]
+equipment_equipped -> equip_items
+-> start
+<- ship_deck
+
+[entry:recruit]
+asked_about_comet -> talk_2
+-> talk_1
+<- exploration
+
+[start]
+officer: "On your feet, soldier!"
+...
+```
+
+### 10.6 Complete Example
+
+```
+# === fire_nation_ship.dlg ===
+
+[characters]
+officer: Fire Nation Officer
+recruit: Nervous Recruit
+
+[state]
+*set talked_before = false
+*set equipment_equipped = false
+
+[entry:officer]
+# Entry conditions (first match wins)
+equipment_equipped -> equip_items
+talked_before && !equipment_equipped -> get_equipment
+-> start
+
+# Exit nodes
+<- equip_items
+<- ship_deck
+
+[entry:recruit]
+asked_about_comet -> talk_recruit_2
+-> talk_recruit_1
+<- exploration_phase
+
+[start]
+officer: "On your feet, recruit!"
+*set talked_before = true
+-> yes_sir: "Yes, sir!"
+-> confused: "What?"
+
+[yes_sir]
+officer: "Good. Get your equipment."
+-> get_equipment
+
+[get_equipment]
+officer: "Your gear's in that locker."
+-> equip_items: "[Equip items]"
+
+[equip_items]
+*set equipment_equipped = true
+officer: "About time. Report to the deck."
+-> ship_deck
+
+[ship_deck]
+officer: "We approach the Southern Air Temple!"
+-> END
+
+[talk_recruit_1]
+recruit: "Nervous about the invasion?"
+*set asked_about_comet = true
+-> exploration_phase
+
+[talk_recruit_2]
+recruit: "Can't wait for the comet!"
+-> exploration_phase
+
+[exploration_phase]
+recruit: "Good luck out there."
+-> END
+```
+
+### 10.7 Web Editor Features
+
+In the Dialogue Forge web editor:
+- **Entry targets** are shown with a green double border
+- **Exit nodes** are shown with a yellow dashed border
+- **Talk to NPC** dropdown appears when entry groups exist
+- **Exit points** show "Conversation Ended" with options to talk again
+
+---
+
+## 11. Best Practices
+
+### 11.1 Node Naming
 - Use descriptive names: `[peng_explains_artifact]`
 - Not generic: `[node_1]`, `[continue]`
 - Group related nodes: `[shop_enter]`, `[shop_buy]`, `[shop_leave]`
 
-### 10.2 Variable Naming
+### 11.2 Variable Naming
 - Booleans: `has_sword`, `knows_secret`, `door_opened`
 - Numbers: `gold`, `karma`, `player_level`
 - Relationships: `peng_relationship`, `vendor_trust`
 
-### 10.3 Writing Style
+### 11.3 Writing Style
 - Keep speaker lines concise
 - Break long speeches into multiple lines
 - Use narrator for actions/descriptions
 - Show emotional context in the writing
 
-### 10.4 Choice Design
+### 11.4 Choice Design
 - Make choices meaningful
 - Show consequences in choice text when helpful
 - Use conditions to create dynamic options
 - Always have at least one available choice
 
-### 10.5 File Organization
+### 11.5 File Organization
 ```
 dialogues/
 ├── main_story/
@@ -402,7 +563,7 @@ dialogues/
 
 ---
 
-## 11. Vim Tips
+## 12. Vim Tips
 
 ### Search and Navigation
 ```vim
@@ -427,7 +588,7 @@ Nodes can be folded at `[node_name]` boundaries for easier navigation.
 
 ---
 
-## 12. Error Messages
+## 13. Error Messages
 
 Parser will report:
 - **Undefined target**: `-> unknown_node` doesn't exist
@@ -438,7 +599,7 @@ Parser will report:
 
 ---
 
-## 13. Quick Conversion Guide
+## 14. Quick Conversion Guide
 
 ### From Your Hierarchical Format:
 ```

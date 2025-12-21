@@ -10,6 +10,8 @@ export class DialoguePlayer {
         this.dialogueData = null;
         this.characters = {};
         this.initialStateCommands = []; // Commands from [state] section
+        this.entries = {}; // Entry groups from [entry:name] sections
+        this.currentEntryGroup = null; // Currently active entry group
         this.state = null;
         this.currentNode = null;
         this.isPlaying = false;
@@ -38,6 +40,7 @@ export class DialoguePlayer {
             this.dialogueData = {};
             this.characters = data.characters || {};
             this.initialStateCommands = data.initial_state || [];
+            this.entries = data.entries || {};
             const startNodeId = startNode || data.start_node;
 
             // Convert graph nodes to dialogue format
@@ -47,7 +50,10 @@ export class DialoguePlayer {
                     id: nodeData.id,
                     lines: nodeData.lines || [],
                     commands: nodeData.commands || [],
-                    choices: []
+                    choices: [],
+                    is_exit_node: nodeData.is_exit_node || false,
+                    is_entry_target: nodeData.is_entry_target || false,
+                    entry_groups: nodeData.entry_groups || []
                 };
             }
 
@@ -197,11 +203,29 @@ export class DialoguePlayer {
         // Create the play modal
         this.modal = document.createElement('div');
         this.modal.className = 'play-modal';
+
+        // Build entry group selector if entries exist
+        const entryNames = Object.keys(this.entries);
+        let entrySelector = '';
+        if (entryNames.length > 0) {
+            entrySelector = `
+                <div class="play-entry-selector">
+                    <label>Talk to:</label>
+                    <select class="entry-group-select">
+                        <option value="">-- Select NPC --</option>
+                        ${entryNames.map(name => `<option value="${name}">${name}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-sm btn-success talk-btn" disabled>Talk</button>
+                </div>
+            `;
+        }
+
         this.modal.innerHTML = `
             <div class="play-modal-backdrop"></div>
             <div class="play-modal-container">
                 <div class="play-modal-header">
                     <h2>Dialogue Playback</h2>
+                    ${entrySelector}
                     <div class="play-modal-controls">
                         <button class="btn btn-sm play-state-btn" title="View/Edit game state">
                             <span>📊</span> State
@@ -290,6 +314,20 @@ export class DialoguePlayer {
             tab.addEventListener('click', (e) => this.switchStateTab(e.target.dataset.tab));
         });
 
+        // Entry group selector (if present)
+        const entrySelect = this.modal.querySelector('.entry-group-select');
+        const talkBtn = this.modal.querySelector('.talk-btn');
+        if (entrySelect && talkBtn) {
+            entrySelect.addEventListener('change', () => {
+                talkBtn.disabled = !entrySelect.value;
+            });
+            talkBtn.addEventListener('click', () => {
+                if (entrySelect.value) {
+                    this.startFromEntryGroup(entrySelect.value);
+                }
+            });
+        }
+
         // Keyboard shortcuts
         this.keyHandler = (e) => {
             if (e.key === 'Escape') {
@@ -300,6 +338,91 @@ export class DialoguePlayer {
 
         // Update stats display
         this.updateStatsDisplay();
+    }
+
+    /**
+     * Start dialogue from an entry group by evaluating its conditions
+     */
+    startFromEntryGroup(entryName) {
+        const entryGroup = this.entries[entryName];
+        if (!entryGroup) {
+            this.app.showNotification(`Entry group "${entryName}" not found`, 'error');
+            return;
+        }
+
+        this.currentEntryGroup = entryName;
+
+        // Find the first matching route
+        for (const route of entryGroup.routes) {
+            if (!route.condition || this.state.evaluateCondition(route.condition)) {
+                // Found a matching entry!
+                this.app.showNotification(`Starting conversation with ${entryName} at [${route.target}]`, 'success');
+
+                // Clear dialogue area for new conversation
+                const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
+                scrollArea.innerHTML = '';
+
+                // Reset visited path for this conversation
+                this.visitedPath = [route.target];
+                this.app.highlightPath(this.visitedPath, route.target);
+
+                // Play from the matched node
+                this.playNode(route.target);
+                return;
+            }
+        }
+
+        // No conditions matched and no default route
+        this.app.showNotification(`No matching entry route for ${entryName} with current state`, 'warning');
+    }
+
+    /**
+     * Check if current node is an exit for the active entry group
+     */
+    isExitNode(nodeId) {
+        if (!this.currentEntryGroup) return false;
+        const entryGroup = this.entries[this.currentEntryGroup];
+        return entryGroup && entryGroup.exits.includes(nodeId);
+    }
+
+    /**
+     * Show the exit point UI when reaching an exit node
+     */
+    async showExitPoint() {
+        const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
+        const choicesArea = this.modal.querySelector('.play-choices-area');
+
+        choicesArea.classList.add('hidden');
+
+        const exitEl = document.createElement('div');
+        exitEl.className = 'dialogue-exit-point';
+        exitEl.innerHTML = `
+            <div class="exit-title">⏸️ Conversation Ended</div>
+            <div class="exit-info">You can now explore or talk to other NPCs.</div>
+            <div class="exit-buttons">
+                <button class="btn btn-primary talk-again-btn">💬 Talk Again</button>
+                <button class="btn btn-secondary continue-btn">▶️ Continue Flow</button>
+            </div>
+        `;
+
+        scrollArea.appendChild(exitEl);
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+
+        // Talk again - re-evaluate entry conditions
+        exitEl.querySelector('.talk-again-btn').addEventListener('click', () => {
+            if (this.currentEntryGroup) {
+                this.startFromEntryGroup(this.currentEntryGroup);
+            }
+        });
+
+        // Continue flow - proceed with the node's choices as normal
+        exitEl.querySelector('.continue-btn').addEventListener('click', async () => {
+            exitEl.remove();
+            const node = this.dialogueData[this.currentNode];
+            if (node) {
+                await this.showChoices(node.choices);
+            }
+        });
     }
 
     close() {
@@ -735,6 +858,12 @@ export class DialoguePlayer {
             if (this.state.evaluateCondition(line.condition)) {
                 await this.displayDialogueLine(line.speaker, line.text, line.tags || []);
             }
+        }
+
+        // Check if this is an exit node for the current entry group
+        if (this.isExitNode(nodeId)) {
+            await this.showExitPoint();
+            return;
         }
 
         // Show choices

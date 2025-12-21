@@ -11,6 +11,42 @@ stranger: Cloaked Stranger
 [state]
 *set gold = 10
 *set reputation = 0
+*set heard_warning = false
+*set stranger_helped = false
+
+# ==========================================
+# ENTRY GROUPS
+# ==========================================
+
+# Barkeep (Old Marta) - main tavern NPC
+[entry:barkeep]
+# If already talked to stranger, Marta just waves
+stranger_helped -> barkeep_wave
+# If heard about the pass, point to stranger
+heard_warning -> talk_stranger
+# Default - welcome to tavern
+-> start
+
+# Exit - player can move around tavern
+<- talk_stranger
+
+# Cloaked Stranger in the corner
+[entry:stranger]
+# If already helped, no more dialogue
+stranger_helped -> stranger_nods
+# Default - approach the stranger
+-> talk_stranger
+
+# No exit - these conversations fully complete
+
+# Brief responses for repeat visits
+[barkeep_wave]
+barkeep: "Safe travels out there!"
+-> END
+
+[stranger_nods]
+stranger: "We'll meet again, traveler."
+-> END
 
 [start]
 narrator: "The Rusty Anchor tavern is warm and dim. A few patrons nurse their drinks."

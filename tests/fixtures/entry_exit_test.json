@@ -1,0 +1,225 @@
+{
+  "characters": {
+    "officer": "Fire Nation Officer",
+    "recruit": "Fire Nation Recruit"
+  },
+  "start_node": "start",
+  "initial_state": [
+    "set talked_before = false",
+    "set equipment_equipped = false"
+  ],
+  "entries": {
+    "officer": {
+      "routes": [
+        {
+          "condition": "equipment_equipped",
+          "target": "equip_items"
+        },
+        {
+          "condition": "talked_before && !equipment_equipped",
+          "target": "get_equipment"
+        },
+        {
+          "condition": null,
+          "target": "start"
+        }
+      ],
+      "exits": [
+        "equip_items",
+        "ship_deck"
+      ]
+    },
+    "recruit": {
+      "routes": [
+        {
+          "condition": "asked_about_comet",
+          "target": "talk_recruit_2"
+        },
+        {
+          "condition": null,
+          "target": "talk_recruit_1"
+        }
+      ],
+      "exits": [
+        "exploration_phase"
+      ]
+    }
+  },
+  "nodes": {
+    "start": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "On your feet, recruit!",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [],
+      "choices": [
+        {
+          "target": "yes_sir",
+          "text": "Yes, sir!",
+          "condition": null
+        },
+        {
+          "target": "confused",
+          "text": "What?",
+          "condition": null
+        }
+      ]
+    },
+    "yes_sir": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "Good. Now get moving.",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [
+        "set talked_before = true"
+      ],
+      "choices": [
+        {
+          "target": "get_equipment",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "confused": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "Wake up, soldier!",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [
+        "set talked_before = true"
+      ],
+      "choices": [
+        {
+          "target": "get_equipment",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "get_equipment": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "Your gear's in that locker.",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [],
+      "choices": [
+        {
+          "target": "equip_items",
+          "text": "[Equip the items]",
+          "condition": null
+        }
+      ]
+    },
+    "equip_items": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "About time. Get to the deck.",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [
+        "set equipment_equipped = true"
+      ],
+      "choices": [
+        {
+          "target": "ship_deck",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "ship_deck": {
+      "lines": [
+        {
+          "speaker": "officer",
+          "text": "We approach the Southern Air Temple!",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [],
+      "choices": [
+        {
+          "target": "END",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "talk_recruit_1": {
+      "lines": [
+        {
+          "speaker": "recruit",
+          "text": "Hey, how're you feeling about the invasion?",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [
+        "set asked_about_comet = true"
+      ],
+      "choices": [
+        {
+          "target": "exploration_phase",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "talk_recruit_2": {
+      "lines": [
+        {
+          "speaker": "recruit",
+          "text": "Can't wait to show what I've got!",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [],
+      "choices": [
+        {
+          "target": "exploration_phase",
+          "text": "",
+          "condition": null
+        }
+      ]
+    },
+    "exploration_phase": {
+      "lines": [
+        {
+          "speaker": "recruit",
+          "text": "Good luck out there!",
+          "condition": null,
+          "tags": []
+        }
+      ],
+      "commands": [],
+      "choices": [
+        {
+          "target": "END",
+          "text": "",
+          "condition": null
+        }
+      ]
+    }
+  }
+}

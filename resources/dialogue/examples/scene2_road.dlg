@@ -19,6 +19,31 @@ stranger: Cloaked Stranger
 # If played standalone, these defaults apply:
 *set gold = 10
 *set reputation = 0
+*set heard_warning = false
+*set stranger_helped = false
+
+# ==========================================
+# ENTRY GROUPS
+# ==========================================
+
+# Bandit encounter on the road
+[entry:bandit]
+# If good reputation, bandits recognize you
+reputation >= 2 -> reputation_check
+# Default - standard holdup
+-> bandit_encounter
+
+# Exit - after dealing with bandits
+<- safe_passage
+
+# Stranger at the campfire (if you took hidden path)
+[entry:stranger]
+# If helped before, friendly reunion
+stranger_helped -> reunion_friendly
+# If not helped, cold reception
+-> reunion_cold
+
+# No exits - scene ends naturally
 
 [start]
 narrator: "The mountain road stretches before you. Cold wind bites at your face."

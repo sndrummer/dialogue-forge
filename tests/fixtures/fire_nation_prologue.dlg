@@ -1,0 +1,723 @@
+# === fire_nation_origin.dlg ===
+# Avatar: The Ashen Path - Fire Nation Origin Story
+# Fire Nation recruitment and Southern Air Temple assault
+
+[characters]
+hero: Fire Nation Soldier
+officer: Fire Nation Officer
+liu_yin: Liu-Yin
+recruit: Fire Nation Recruit
+recruit2: Fire Nation Recruit
+gyatso: Monk Gyatso
+peng: Peng Ruogang
+boyang: Boyang
+narrator: Narrator
+
+[state]
+# Initial player state at start of Fire Nation prologue
+*set harmony = 0
+*set discord = 0
+*set xp = 0
+*set dissent = 0
+
+# Scene progression flags - all start false
+*set tutorial_equipment_shown = false
+*set picked_berries = false
+*set roasted_pig = false
+*set trap_disarmed = false
+*set trap_active = false
+
+# Character relationship tracking
+*set peng_relationship = 0
+
+# ==========================================
+# SCENE 1: SHIP INTERIOR - AWAKENING
+# ==========================================
+
+[start]
+# Player awakens in Fire Nation ship bunkroom
+officer: "On your feet, recruit! The Fire Lord doesn't tolerate weakness.
+    Move it, or I'll give you a reason to jump out of that bunk!"
+-> yes_sir: "Yes, sir! Coming, sir!"
+-> confused: "What? Where are we? Where are we going?"
+-> sleepy: "Just five more minutes..."
+
+[yes_sir]
+officer: "Good. We're the first wave hitting the Southern Air Temple. Every firebender counts today."
+-> ask_objective: "Understood, sir. But uh... what's our objective at the temple, again?"
+-> ready_to_serve: "I will do as you command, sir. No one will stand in our way!"
+
+[confused]
+officer: "Hmmph, I see the new recruits have the brains of a koala-sheep.
+    WAKE UP, soldier! Get to the deck, now! We're approaching the Southern Air Temple!"
+-> confused_temple: "The Southern Air Temple? Are we here for..."
+-> confused_apologize: "I'm sorry, sir. I'm ready now."
+
+[sleepy]
+officer: "Five more minutes? I'll give you five seconds before you're scrubbing
+    the boiler room for the rest of this campaign! Get on deck, NOW!"
+-> sleepy_apologize: "I apologize, sir. I'm ready now."
+
+[ask_objective]
+officer: "Were you not paying attention at the briefing? We're here to eliminate
+    ALL resistance. That means if you see anything that isn't Fire Nation, it
+    better be crispy by nightfall! Oh and watch out for Monk Gyatso, he may be
+    old but he's more dangerous than he appears."
+-> acknowledge: "I will do as you command, sir. No one will stand in our way."
+
+[acknowledge]
+officer: "Good. Now get moving and bring honor to the Fire Nation."
+-> get_equipment
+
+[ready_to_serve]
+officer: "Good. Now get moving and bring honor to the Fire Nation."
+-> get_equipment
+
+[confused_temple]
+officer: "We're here to bring an end to the Air Nomads and the threat they pose
+    to the Fire Nation. We must flush out their leader, Monk Gyatso. He is a
+    skilled master bender and dangerous, despite his age."
+-> ask_about_gyatso: "Monk Gyatso? The Pai Sho-playing monk? Why him?"
+-> understood: "Understood, sir. I will bring honor to the Fire Nation!"
+
+[confused_apologize]
+[sleepy_apologize]
+officer: "Good. Stay sharp - this isn't a training exercise. And beware of their
+    leader, Monk Gyatso. I've heard tales of his abilities. We must bring him
+    down in order to secure a future for the Fire Nation."
+-> understood: "Yes sir. I won't let you down."
+
+[ask_about_gyatso]
+officer: "Don't be fooled - his abilities as a bender far outweigh his skills at
+    a board game. He must be brought down in order to secure a future for the
+    Fire Nation."
+-> get_equipment
+
+[understood]
+officer: "Good. Now get moving, recruit!"
+-> get_equipment
+
+[get_equipment]
+officer: "Your gear's in that locker. Suit up fast - we attack when the comet reaches its peak."
+*set tutorial_equipment_shown = true
+narrator: "Open your inventory and equip the Fire Nation uniform, bending-focused utility belt, and protective armor."
+-> equip_items: "[Equip the items]"
+
+[equip_items]
+-> ready: "Ready, sir."
+
+[ready]
+officer: "About time. And remember, the comet will provide you incredible bending
+    power so even a novice recruit like yourself can bend like a master. But
+    don't get cocky! We aren't here to show off, we're here to show the might
+    of the Fire Nation! Now get to the deck."
+-> ship_deck
+
+# ==========================================
+# SCENE 2: SHIP DECK - BRIEFING
+# ==========================================
+
+[ship_deck]
+# Exterior - Fire Nation Ship, Southern Air Temple - Sozin's Comet burns distantly
+officer: "Attention recruits! In moments, we will approach the shores of Patola
+    where a mountain path will lead us to the Southern Air Temple. There, we
+    will support the larger invasion force."
+officer: "Now I know you're green; but with the power boost from Sozin's Comet,
+    our firebending is at its peak. We will face the Air Nomads with unmatched
+    strength. Show no mercy!"
+officer: "These monks, despite their peaceful guise, are staunch defenders of
+    their ways and will resist our efforts fiercely. They are not to be
+    underestimated. Be vigilant and ready for anything!"
+-> beach_landing
+
+# ==========================================
+# SCENE 3: BEACH LANDING - FIRST COMBAT
+# ==========================================
+
+[beach_landing]
+# Patola Island Beach - Day
+narrator: "An Airbender emerges from the mountain path and pushes the boat back out to sea."
+officer: "Soldiers, attack!"
+*start_combat tutorial_combat
+narrator: "The Airbender makes a strategic retreat back up the mountain path.
+    The Fire Nation battalion, now stranded, prepares to advance."
+-> mountain_path
+
+# ==========================================
+# SCENE 4: MOUNTAIN PATH - EXPLORATION
+# ==========================================
+
+[mountain_path]
+officer: "Alright, take five! We reach the temple when the comet hits its peak.
+    I need everyone combat-ready. That means you too, Liu-Yin."
+liu_yin: "Ready, sir!"
+officer: "You, recruit. Scout the path ahead for traps. And see what's edible up here - we might be here a while."
+-> ask_traps: "What kind of traps?"
+-> ask_food: "Food? Up here?"
+-> eager: "Right away, sir."
+-> uncomfortable: "This doesn't feel right..."
+
+[ask_traps]
+officer: "The airbenders use the mountain against their enemies. Watch for
+    rockslides they can trigger, hidden pits, wind traps. Anything that looks
+    too convenient is probably a trap."
+-> exploration_phase
+
+[ask_food]
+officer: "Mountain's full of quail-pigs and rock-chucks if you know where to
+    look. Some berries grow at this altitude too. Just don't eat anything
+    you're not sure about - last thing we need is soldiers puking their guts
+    out."
+-> exploration_phase
+
+[eager]
+officer: "Good. Make it quick - we need to hit them while the comet's still burning."
+-> exploration_phase
+
+[uncomfortable]
+*add dissent = 1
+officer: "Keep those thoughts to yourself, recruit. The Fire Lord's orders are absolute. Now scout ahead!"
+-> exploration_phase
+
+[exploration_phase]
+narrator: "You can explore the area, speak to Fire Nation soldiers, and search for collectibles."
+# Player can find: Quail-pig, Berries, Airbender Trap
+-> talk_recruit_1: "[Talk to a recruit about the invasion]"
+-> talk_recruit_2: "[Ask a recruit about the Airbenders]"
+-> talk_recruit_3: "[Talk to a recruit about supplies]"
+-> find_berries: "[Search for berries]" {!picked_berries}
+-> find_quailpig: "[Follow animal tracks]" {!roasted_pig}
+-> find_trap: "[Scout the northern path]" {!trap_disarmed}
+-> report_back: "[Report to the officer]"
+
+# ==========================================
+# NPC INTERACTIONS
+# ==========================================
+
+[talk_recruit_1]
+-> ask_recruit_1: "Hey, pal! How're you feeling about the invasion?"
+
+[ask_recruit_1]
+recruit: "Can't wait to show what I've got! You feel that power from the comet? I've never bent flames this hot before!"
+-> exploration_phase
+
+[talk_recruit_2]
+-> ask_recruit_2: "Why are we attacking the Airbenders? Aren't they peaceful?"
+
+[ask_recruit_2]
+recruit: "Peaceful? Wake up! The Avatar comes from the Air Nomads - the most
+    powerful bender in the world, and they've been hiding him. The Fire Lord
+    says if we don't wipe them out now, the Avatar will grow up to destroy
+    everything we've built. We're not just following orders - we're preventing
+    the end of our civilization."
+-> exploration_phase
+
+[talk_recruit_3]
+-> ask_recruit_3: "Where should I look for enemies or food?"
+
+[ask_recruit_3]
+recruit: "Check the bushes for quail-pig tracks - they nest in the scrub. And
+    watch the ridgeline, that's where I'd set an ambush if I were them.
+    Flameo, hotman!"
+-> exploration_phase
+
+# ==========================================
+# EXPLORATION DISCOVERIES
+# ==========================================
+
+[find_berries]
+narrator: "You find a bush heavy with mountain berries. These could serve as emergency rations if needed."
+-> pick_berries: "[Pick berries]"
+-> leave_berries: "[Leave the bush alone]"
+
+[pick_berries]
+*give_item berries
+*set picked_berries = true
+narrator: "Berries added to inventory."
+-> exploration_phase
+
+[leave_berries]
+-> exploration_phase
+
+[find_quailpig]
+narrator: "You find a quail-pig in the bushes, shivering with fear when it spots you. What do you do?"
+-> roast_pig: "[Roast the pig]"
+-> spare_pig: "[Leave the pig alone]"
+
+[roast_pig]
+*give_item roasted_quail_pig
+*set roasted_pig = true
+*add discord = 1
+narrator: "You roast the quail-pig with your firebending. The smell of cooked meat fills the air."
+-> exploration_phase
+
+[spare_pig]
+-> exploration_phase
+
+[find_trap]
+narrator: "You discover thin air channels carved into the rock face, connected by
+    rope triggers. An airbender trap - one gust of wind through these channels
+    would trigger a rockslide."
+-> disarm_trap: "[Disarm the trap]"
+-> leave_trap: "[Leave the trap intact]"
+
+[disarm_trap]
+*set trap_disarmed = true
+narrator: "You carefully disarm the trap, ensuring safe passage for the battalion."
+-> exploration_phase
+
+[leave_trap]
+*set trap_active = true
+narrator: "You decide to leave the trap as it is."
+-> exploration_phase
+
+# ==========================================
+# REPORTING BACK
+# ==========================================
+
+[report_back]
+officer: "Yes? Have you found something?"
+-> not_yet: "Not yet, sir!"
+-> report_trap: "Yes, sir. I found and disarmed a trap near the mountain path." {trap_disarmed}
+-> lie_trap: "(Lie) No, sir. The path is clear." {trap_active}
+-> report_pig: "Yes, sir! I've roasted this pig to share with the battalion." {has_item:roasted_quail_pig}
+-> report_berries: "Yes, sir! I have these berries to share." {has_item:berries}
+
+[not_yet]
+officer: "Then why are you wasting my time? The comet won't burn forever! Move!"
+-> exploration_phase
+
+[report_trap]
+*add harmony = 1
+officer: "Great work, recruit. Soldiers, let's get moving!"
+-> temple_approach
+
+[lie_trap]
+*add discord = 1
+officer: "Good. Form up, everyone! The path is clear, so we make our assault now!"
+-> temple_approach
+
+[report_pig]
+*remove_item roasted_quail_pig
+*add xp = 10
+officer: "Excellent initiative, recruit! A well-fed soldier is a fighting soldier."
+-> report_back
+
+[report_berries]
+*remove_item berries
+*add xp = 5
+*add harmony = 1
+officer: "Berries? Better than nothing, I suppose. Pass them around, recruits."
+-> report_back
+
+# ==========================================
+# TEMPLE APPROACH
+# ==========================================
+
+[temple_approach]
+officer: "Ready your flames! Today we bring glory to the Fire Nation!"
+-> check_trap
+
+[check_trap]
+*set checked_trap = true
+-> trap_triggers: {trap_active}
+-> no_trap_consequence: {!trap_active}
+
+[trap_triggers]
+narrator: "The hidden air channels activate with a violent whoosh. A massive gust
+    catches the officer mid-stride, hurling him off the mountain path."
+# Wilhelm scream
+*set officer_gone = true
+*add harmony = 1
+*add discord = 2
+recruit: "The Sergeant! What do we do?"
+recruit2: "Continue with the mission! That's what the Fire Lord would want!"
+-> gyatso_encounter
+
+[no_trap_consequence]
+narrator: "The officer proceeds up and sets out a rope for the others to climb."
+-> gyatso_encounter
+
+# ==========================================
+# SCENE 5: TEMPLE ENTRANCE - MONK GYATSO
+# ==========================================
+
+[gyatso_encounter]
+narrator: "Monk Gyatso fights off waves of Fire Nation Soldiers as the Comet
+    comes into full power overhead."
+gyatso: "I see soldiers who have lost their way. Your Fire Lord asks you to
+    extinguish life itself - but violence only brings more violence. Turn back,
+    young ones. This is not the path to glory."
+-> officer_charge: {!officer_gone}
+-> refuse_fight: "You're right. I won't fight you!" {officer_gone}
+-> do_duty: "I must do my duty." {officer_gone}
+-> for_glory: "For the glory of the Fire Lord!" {officer_gone}
+
+[officer_charge]
+officer: "Charge!"
+-> gyatso_battle
+
+[refuse_fight]
+*add harmony = 2
+gyatso: "Then there may be hope for the people of the Fire Nation."
+narrator: "Gyatso sends you sliding down the mountain in a blast of air."
+-> cliff_scene
+
+[do_duty]
+gyatso: "My greatest student taught me the wisdom in running from duty...
+    Sometimes our destiny lies outside of duty, young one. I hope my student
+    comes to understand this, in time, as do you."
+-> gyatso_battle: "[Fight]"
+
+[for_glory]
+*add discord = 2
+gyatso: "Your Fire Lord promises glory, but delivers only ash. My student
+    understood that true strength lies in refusing power, not seeking it.
+    You'll learn this truth... but I fear the lesson will cost you dearly."
+-> gyatso_battle: "[Fight]"
+
+[gyatso_battle]
+# Combat: Player must get Gyatso to half-health with comet-boosted bending
+# Gyatso is extremely powerful and takes minimal damage
+*start_combat gyatso_boss
+narrator: "Your fire barely reaches him through the swirling winds. With movements
+    like a gentle breeze that becomes a storm, Gyatso deflects every attack
+    effortlessly."
+narrator: "With a sweeping motion, Gyatso creates a hurricane that scatters the
+    Firebenders and sends you sliding down the mountain."
+# Falling animation plays - FADE TO BLACK
+-> cliff_scene
+
+# ==========================================
+# SCENE 6: CLIFF RESCUE - MEETING PENG
+# ==========================================
+
+[cliff_scene]
+# EXTERIOR - PATOLA ISLAND - NORTH BEACH - DUSK
+narrator: "You awaken on a precipice over a larger drop down the mountain.
+    Dangling unconscious in a tangle of vines from the cliffside is an
+    Airbender boy with a strange wooden device in his belt."
+narrator: "The cliff where the Airbender boy lies unconscious appears unstable.
+    You may need to act quickly if you wish to save him."
+-> approach_peng: "[Approach the boy]"
+-> leave_peng: "[Leave the area]"
+
+[leave_peng]
+narrator: "The cliffside breaks away, taking the airbender with it. As he falls, the
+    wooden artifact tumbles free from his belt and lands at your feet."
+narrator: "You pick up the Interesting Wooden Artifact, wondering what it could be..."
+*add discord = 2
+*give_item avatar_artifact
+*set abandoned_peng = true
+-> beach_alone
+
+[approach_peng]
+narrator: "As you step closer, you notice the earth cracking at the edge of the
+    cliff. If you don't act now, the boy could fall."
+narrator: "You also notice he is carrying an INTERESTING WOODEN ARTIFACT."
+-> save_peng: "[Quickly try to free the boy's leg and pull him to safety]"
+-> grab_artifact: "[Grab the Interesting Wooden Artifact]"
+-> too_risky: "[Decide it's too risky and walk away]"
+-> push_peng: "[Send the airbender falling]"
+
+[save_peng]
+narrator: "You successfully pull the boy to safety as the cliff gives way,
+    rescuing him. As you haul him up, a wooden artifact tumbles from his belt
+    into your hands."
+narrator: "The motion appears to have shaken him awake."
+*add harmony = 2
+*give_item avatar_artifact
+*set peng_saved = true
+-> peng_dialogue
+
+[grab_artifact]
+narrator: "The Interesting Wooden Artifact slides easily free just as the cliff
+    gives way, sending the airbender falling."
+# Wilhelm scream
+*add discord = 2
+*give_item avatar_artifact
+*set peng_dead = true
+-> beach_alone
+
+[too_risky]
+narrator: "You turn your back on the trapped airbender, leaving him to plummet.
+    But the Interesting Wooden Artifact falls loose in the snow. You pick it
+    up..."
+*add discord = 2
+*give_item avatar_artifact
+*set peng_dead = true
+-> beach_alone
+
+[push_peng]
+narrator: "You send a blast of fire toward the vines. He plummets to what is
+    likely his death. But the Interesting Wooden Artifact falls loose in the
+    snow. You pick it up..."
+*add discord = 3
+*give_item avatar_artifact
+*set peng_dead = true
+-> beach_alone
+
+# ==========================================
+# PENG DIALOGUE
+# ==========================================
+
+[peng_dialogue]
+peng: "Oh, whoa. What happened? ... Oh great. You're a Firebender."
+-> not_agree: "I may be Fire Nation, but I don't agree with anything that happened here."
+-> lost_battalion: "I am, but I'm not sure that means anything anymore. I lost my whole battalion."
+-> take_prisoner: "Yes, I am a Firebender, and it's my duty to take you prisoner."
+-> give_death: "I am, and now I'm going to give you an honorable death."
+
+[not_agree]
+peng: "I know I should be more wary of you...but you did save my life. Means you can't be completely evil."
+-> peng_philosophy
+
+[lost_battalion]
+peng: "I know I should be more wary of you...but you did save my life. Means you can't be completely evil."
+-> peng_philosophy
+
+[peng_philosophy]
+-> explain_situation: "I'm not here by choice. Everything happening... I can't say I agree with it."
+
+[explain_situation]
+peng: "That's... actually surprising to hear. I've always seen Fire Nation
+    soldiers as the enemy, but I guess it's not that simple, is it?"
+peng: "It's strange to think that some of you might be just as trapped by this war as we are."
+-> its_complicated: "It's complicated. There are many of us who don't support
+    the war, but speaking out... it's not really an option."
+
+[its_complicated]
+peng: "Then maybe there's hope for this war! I mean, here you are, a Fire
+    Nation soldier, saving an Airbender. You're not like the others, are you?"
+peng: "Maybe... maybe there's a way we can help each other out. What do you think?"
+-> interested: "I'm interested. Let's see where this goes."
+-> survival: "Maybe. But this is about survival, not friendship."
+-> work_alone: "Sorry, I need to do this alone."
+-> dont_follow: "No, and don't follow me."
+
+[interested]
+peng: "Radical. Maybe together, we can make a real difference. I'm Peng, by the way."
+-> introduce_self: "I'm [PlayerName]. Nice to meet you, Peng."
+
+[introduce_self]
+peng: "Likewise."
+# Rumbling sound
+peng: "Can we find something to eat now?"
+-> lets_go: "Great. Now let's get moving."
+
+[lets_go]
+peng: "Right behind ya, hotman!"
+*add_companion peng
+*set peng_in_party = true
+*add peng_relationship = 10
+-> artifact_discovery
+
+[survival]
+peng: "Understood. For now, let's just focus on getting through this. I'm Peng, by the way."
+-> introduce_brief: "I'm [PlayerName]."
+
+[introduce_brief]
+peng: "Likewise."
+# Rumbling sound
+peng: "Can we find something to eat now?"
+-> lets_move: "Fine. Let's get moving."
+
+[lets_move]
+peng: "Right behind ya, hotman!"
+*add_companion peng
+*set peng_in_party = true
+*add peng_relationship = 5
+-> artifact_discovery
+
+[work_alone]
+peng: "Oh, well. That is truly disappointing and I think I'll go off and cry forever now, but I understand. I do."
+# whispers
+peng: "Jerk."
+*set peng_rejected = true
+-> beach_alone
+
+[dont_follow]
+peng: "Well, you can... Eat a bag of fire-ferret dung for all I care! Fire Nation, you're all the same."
+*set peng_rejected = true
+*add discord = 1
+-> beach_alone
+
+[take_prisoner]
+-> threaten_prisoner: "Yes. You're my prisoner now. No sudden moves, Airbender scum."
+
+[threaten_prisoner]
+peng: "Ha ha. Very funny. I'm Peng, by the way."
+-> serious_threat: "No, I meant it. I'm watching you nomad scum."
+
+[serious_threat]
+peng: "Okay then...."
+-> introduce_prisoner: "I'm [PlayerName]. Nice to meet you, Peng."
+
+[introduce_prisoner]
+peng: "Likewise."
+# Rumbling sound
+*add_companion peng
+*set peng_in_party = true
+*set peng_prisoner = true
+-> artifact_discovery
+
+[give_death]
+peng: "Oh yeah, you wanna test me, Fire Nation scum? Looks like your precious comet has faded away."
+-> challenge_accepted: "Bring it on."
+
+[challenge_accepted]
+*start_combat peng_boss_fight
+-> peng_defeated
+
+[peng_defeated]
+peng: "Fine, you beat me. I concede. You gonna kill me now or what? Go on. I'll die honorably!"
+-> spare_peng: "No, I won't kill you. Get out of here. Find a safe path away from the Fire Nation."
+-> kill_peng: "Then perish."
+
+[spare_peng]
+narrator: "Remember your actions in this world have consequences."
+*add harmony = 1
+*add discord = 1
+-> beach_alone
+
+[kill_peng]
+narrator: "The Airbender fell, but you didn't see him land. Remember your actions in this world have consequences."
+*add discord = 5
+-> beach_alone
+
+# ==========================================
+# ARTIFACT DISCOVERY
+# ==========================================
+
+[artifact_discovery]
+peng: "Hold on, is that the Avatar Artifact you've got there? I thought I lost that!"
+-> lie_artifact: "No. This is mine. My, uh, grandma gave it to me."
+-> return_artifact: "Oh, is this yours? You can have it back."
+-> whats_happening: "Hold on... What's it doing?"
+
+[lie_artifact]
+peng: "No it isn't! I was holding onto that! I was tasked with keeping it safe! I..."
+# Peng stops, choked up with emotion
+-> artifact_reaction
+
+[return_artifact]
+-> artifact_reaction
+
+[whats_happening]
+-> artifact_reaction
+
+[artifact_reaction]
+-> feel_energy: "I feel something coming off it, some kind of energy..."
+
+[feel_energy]
+peng: "It's reacting to you, look! I've never seen that before. You better hang
+    onto it; that definitely means something."
+-> ask_what_it_is: "What is it?"
+
+[ask_what_it_is]
+peng: "It's a powerful relic of a former Avatar. Legend has it, he imbued part
+    of his Avatar spirit in it, in the case that the Avatar vanished from the
+    world."
+peng: "This—among other relics—ensure the Avatar has something to tie him back
+    to this place. I was tasked with keeping it safe. Monk Gyatso—"
+# Peng stops, choked up with emotion
+peng: "He asked me to keep it safe."
+-> offer_return: "I can give it back. I shouldn't be the one carrying this."
+-> protect_artifact: "Then I'll protect it with my life."
+-> keep_artifact: "Alright then. Guess I'll just hang onto that."
+
+[offer_return]
+peng: "No, no. It reacted to you. I think Aa—the Avatar would want you to have it."
+-> protect_artifact
+
+[protect_artifact]
+peng: "Thank you. Wow, never thought I'd actually like a Firebender. What a world."
+*add peng_relationship = 5
+-> unagi_encounter
+
+[keep_artifact]
+# Peng weeps silently
+-> unagi_encounter
+
+# ==========================================
+# UNAGI ENCOUNTER
+# ==========================================
+
+[unagi_encounter]
+narrator: "The Avatar Artifact in your possession pulses with energy. You feel a
+    surge of power, a fragment of the Avatar's abilities coursing through you."
+narrator: "Use the Avatar power special attack to fend off the Unagi!"
+*start_combat unagi_boss
+peng: "Wow, that was... incredible! You channeled the power of the Avatar! It's
+    been so long since...I mean, I've never seen something like that!"
+    {peng_in_party}
+narrator: "You collapse from exhaustion." {!peng_in_party}
+narrator: "Peng collapses with exhaustion, followed by you." {peng_in_party}
+-> boyang_arrival
+
+[beach_alone]
+narrator: "You make your way down to the beach alone, the weight of your choices heavy on your shoulders."
+-> check_artifact
+
+[check_artifact]
+narrator: "The Avatar Artifact pulses with energy. You feel a surge of power." {has_item:avatar_artifact}
+*start_combat unagi_boss {has_item:avatar_artifact}
+narrator: "You collapse from exhaustion." {has_item:avatar_artifact}
+-> boyang_arrival
+
+# ==========================================
+# SCENE 7: MEETING BOYANG
+# ==========================================
+
+[boyang_arrival]
+# Exterior - Patola Island, North Beach - Night
+# Boyang saw the artifact light show from the Unagi battle
+boyang: "That light in the sky... haven't seen anything like it in decades. You wouldn't happen to know what caused it?"
+-> peng_interrupts {peng_in_party}
+-> lie_boyang: "(Lie) No, I don't know anything about that." {!peng_in_party}
+-> admit_artifact: "I found an artifact. It... reacted to me." {!peng_in_party}
+-> guess_as_good: "Your guess is as good as mine." {!peng_in_party}
+-> stay_silent: "[Stay silent]" {!peng_in_party}
+
+[peng_interrupts]
+peng: "Yeah, that was my fri—I mean... No. No lights. What lights? We definitely didn't see any lights. Not us."
+boyang: "Hold on, there. A Fire Nation soldier and an Airbender together? Now that's a sight you don't see every day."
+boyang: "Makes an old fisherman wonder what kind of storm has brought you two together."
+peng: "Yeah, it's a... long story. Do you think we can trust him?" {peng_saved && !peng_prisoner}
+boyang: "Trust is a rare and valuable thing. I will allow you and your friend to
+    spare your judgment for now. Without standards, no boundaries are set,
+    after all."
+-> boyang_offer
+
+[lie_boyang]
+-> boyang_offer
+
+[admit_artifact]
+boyang: "An artifact, you say? Interesting. Very interesting."
+-> boyang_offer
+
+[guess_as_good]
+-> boyang_offer
+
+[stay_silent]
+boyang: "Hm. The silent type. That's fine - some secrets are worth keeping."
+-> boyang_offer
+
+[boyang_offer]
+boyang: "You two look like you've been through the wringer. I'm no friend of the
+    Fire Nation's ways, but I'm willing to give you a chance." {peng_in_party}
+boyang: "You look like you've been through the wringer. I'm no friend of the
+    Fire Nation's ways, but I'm willing to give you a chance." {!peng_in_party}
+boyang: "How about you come aboard, and we can talk it over some hot shrimp stew?
+    And don't mind the smell; it came with the boat!"
+-> accept_offer: "What choice do I have?"
+
+[accept_offer]
+*set prologue_complete = true
+*set boyang_met = true
+boyang: "Make yourself comfortable. We have a long journey ahead, and much to discuss."
+narrator: "The old vessel creaks beneath your feet as Patola Island shrinks into the mist. Whatever comes next, there's no going back."
+-> END
+
+# END FIRE NATION ORIGIN STORY
+

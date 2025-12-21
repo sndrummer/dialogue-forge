@@ -690,3 +690,331 @@ hero: "Ready to go!"
         assert 'set has_key = false' in dialogue.initial_state
         assert 'set reputation = 0' in dialogue.initial_state
         assert 'give_item torch' in dialogue.initial_state
+
+
+class TestEntryGroups:
+    """Test entry group parsing for conversation entry points."""
+
+    def test_parse_basic_entry_group(self):
+        """Test parsing a basic entry group with routes and exits."""
+        content = """
+[characters]
+officer: Officer
+
+[entry:officer]
+equipment_equipped -> equip_items
+-> start
+<- equip_items
+
+[start]
+officer: "Hello!"
+-> equip_items: "Get gear"
+
+[equip_items]
+officer: "Equipped!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        assert 'officer' in dialogue.entries
+        entry = dialogue.entries['officer']
+
+        # Check routes
+        assert len(entry.routes) == 2
+        assert entry.routes[0].condition == 'equipment_equipped'
+        assert entry.routes[0].target == 'equip_items'
+        assert entry.routes[1].condition is None  # Default route
+        assert entry.routes[1].target == 'start'
+
+        # Check exits
+        assert len(entry.exits) == 1
+        assert 'equip_items' in entry.exits
+
+    def test_multiple_entry_groups(self):
+        """Test parsing multiple entry groups in same file."""
+        content = """
+[characters]
+officer: Officer
+recruit: Recruit
+
+[entry:officer]
+-> start
+<- ship_deck
+
+[entry:recruit]
+asked_about_comet -> talk_2
+-> talk_1
+<- exploration
+
+[start]
+officer: "Hello!"
+-> ship_deck
+
+[ship_deck]
+officer: "We're here!"
+-> END
+
+[talk_1]
+recruit: "Hey!"
+-> exploration
+
+[talk_2]
+recruit: "The comet!"
+-> exploration
+
+[exploration]
+recruit: "Good luck!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        assert 'officer' in dialogue.entries
+        assert 'recruit' in dialogue.entries
+
+        officer_entry = dialogue.entries['officer']
+        assert len(officer_entry.routes) == 1
+        assert len(officer_entry.exits) == 1
+        assert 'ship_deck' in officer_entry.exits
+
+        recruit_entry = dialogue.entries['recruit']
+        assert len(recruit_entry.routes) == 2
+        assert recruit_entry.routes[0].condition == 'asked_about_comet'
+        assert 'exploration' in recruit_entry.exits
+
+    def test_complex_entry_conditions(self):
+        """Test entry groups with complex conditions."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+has_sword && reputation > 10 -> armed_greeting
+!talked_before || is_angry -> hostile_greeting
+has_item:key -> key_greeting
+-> default_greeting
+<- key_greeting
+
+[default_greeting]
+npc: "Hello."
+-> END
+
+[armed_greeting]
+npc: "Nice weapon!"
+-> END
+
+[hostile_greeting]
+npc: "What do you want?"
+-> END
+
+[key_greeting]
+npc: "You have the key!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        entry = dialogue.entries['npc']
+        assert len(entry.routes) == 4
+
+        assert entry.routes[0].condition == 'has_sword && reputation > 10'
+        assert entry.routes[0].target == 'armed_greeting'
+
+        assert entry.routes[1].condition == '!talked_before || is_angry'
+        assert entry.routes[1].target == 'hostile_greeting'
+
+        assert entry.routes[2].condition == 'has_item:key'
+        assert entry.routes[2].target == 'key_greeting'
+
+        assert entry.routes[3].condition is None
+        assert entry.routes[3].target == 'default_greeting'
+
+    def test_multiple_exits(self):
+        """Test entry groups with multiple exit nodes."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+-> start
+<- exit_a
+<- exit_b
+<- exit_c
+
+[start]
+npc: "Hello!"
+-> exit_a: "Option A"
+-> exit_b: "Option B"
+-> exit_c: "Option C"
+
+[exit_a]
+npc: "Bye A!"
+-> END
+
+[exit_b]
+npc: "Bye B!"
+-> END
+
+[exit_c]
+npc: "Bye C!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        entry = dialogue.entries['npc']
+        assert len(entry.exits) == 3
+        assert 'exit_a' in entry.exits
+        assert 'exit_b' in entry.exits
+        assert 'exit_c' in entry.exits
+
+    def test_entry_group_validation_invalid_target(self):
+        """Test that invalid entry targets are caught."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+-> nonexistent_node
+<- also_nonexistent
+
+[start]
+npc: "Hello!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+        valid = parser.validate()
+
+        assert not valid
+        assert any('nonexistent_node' in err for err in dialogue.errors)
+        # Exits generate warnings, not errors
+        assert any('also_nonexistent' in warn for warn in dialogue.warnings)
+
+    def test_entry_group_no_default_warning(self):
+        """Test warning when entry group has no default route."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+has_key -> key_route
+
+[start]
+npc: "Hello!"
+-> END
+
+[key_route]
+npc: "You have the key!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+        parser.validate()
+
+        assert any('no default entry route' in warn for warn in dialogue.warnings)
+
+    def test_entry_group_stats(self):
+        """Test that entry groups are included in stats."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+condition1 -> route1
+condition2 -> route2
+-> default
+<- exit1
+<- exit2
+
+[route1]
+npc: "Route 1"
+-> END
+
+[route2]
+npc: "Route 2"
+-> END
+
+[default]
+npc: "Default"
+-> END
+
+[exit1]
+npc: "Exit 1"
+-> END
+
+[exit2]
+npc: "Exit 2"
+-> END
+"""
+        parser = DialogueParser()
+        parser.parse_lines(content.strip().split('\n'))
+
+        stats = parser.get_stats()
+        assert stats['entry_groups'] == 1
+        assert stats['entry_routes'] == 3
+        assert stats['exit_nodes'] == 2
+
+    def test_entry_targets_make_nodes_reachable(self):
+        """Test that nodes reachable from entry routes are not marked unreachable."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+has_key -> secret_route
+-> start
+
+[start]
+npc: "Hello!"
+-> END
+
+[secret_route]
+npc: "You found the secret!"
+-> hidden_node
+
+[hidden_node]
+npc: "Very hidden!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+        parser.validate()
+
+        # secret_route and hidden_node should NOT be marked unreachable
+        # because they're reachable from the entry group
+        unreachable_warnings = [w for w in dialogue.warnings if 'unreachable' in w.lower()]
+        assert not any('secret_route' in w for w in unreachable_warnings)
+        assert not any('hidden_node' in w for w in unreachable_warnings)
+
+    def test_parse_entry_with_comments(self):
+        """Test that comments in entry groups are handled."""
+        content = """
+[characters]
+npc: NPC
+
+[entry:npc]
+# This is a comment about the entry routing
+has_key -> key_route
+# Default route below
+-> start
+
+# Exit markers
+<- key_route
+
+[start]
+npc: "Hello!"
+-> END
+
+[key_route]
+npc: "Key!"
+-> END
+"""
+        parser = DialogueParser()
+        dialogue = parser.parse_lines(content.strip().split('\n'))
+
+        entry = dialogue.entries['npc']
+        assert len(entry.routes) == 2
+        assert entry.routes[0].condition == 'has_key'
+        assert entry.routes[1].condition is None

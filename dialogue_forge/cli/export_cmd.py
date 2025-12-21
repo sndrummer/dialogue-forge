@@ -30,8 +30,19 @@ def export_to_json(dlg_path: Path, output_path: Path = None):
         "characters": dialogue.characters,
         "start_node": dialogue.start_node,
         "initial_state": dialogue.initial_state,
+        "entries": {},
         "nodes": {},
     }
+
+    # Convert entry groups
+    for entry_name, entry_group in dialogue.entries.items():
+        json_data["entries"][entry_name] = {
+            "routes": [
+                {"condition": route.condition, "target": route.target}
+                for route in entry_group.routes
+            ],
+            "exits": entry_group.exits,
+        }
 
     # Convert each node
     for node_id, node in dialogue.nodes.items():
@@ -58,6 +69,8 @@ def export_to_json(dlg_path: Path, output_path: Path = None):
     print(f"✅ Exported to: {output_path}")
     print(f"   • {len(dialogue.nodes)} nodes")
     print(f"   • {len(dialogue.characters)} characters")
+    if dialogue.entries:
+        print(f"   • {len(dialogue.entries)} entry groups")
     if dialogue.initial_state:
         print(f"   • {len(dialogue.initial_state)} initial state commands")
 
