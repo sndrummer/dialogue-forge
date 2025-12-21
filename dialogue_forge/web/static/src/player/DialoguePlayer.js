@@ -10,8 +10,10 @@ export class DialoguePlayer {
         this.dialogueData = null;
         this.characters = {};
         this.initialStateCommands = []; // Commands from [state] section
-        this.entries = {}; // Entry groups from [entry:name] sections
-        this.currentEntryGroup = null; // Currently active entry group
+        this.entries = {}; // Entry groups from [entry:name] sections (legacy)
+        this.triggers = {}; // Trigger map: target -> [{type, target, condition, nodeId}]
+        this.currentEntryGroup = null; // Currently active entry group (legacy)
+        this.currentTrigger = null; // Currently active trigger target (e.g., "officer")
         this.state = null;
         this.currentNode = null;
         this.isPlaying = false;
@@ -47,7 +49,8 @@ export class DialoguePlayer {
             this.knownCompanions = data.stats?.known_companions || [];
             const startNodeId = startNode || data.start_node;
 
-            // Convert graph nodes to dialogue format
+            // Convert graph nodes to dialogue format and build trigger map
+            this.triggers = {};
             for (const node of data.graph.nodes) {
                 const nodeData = node.data;
                 this.dialogueData[nodeData.id] = {
@@ -56,9 +59,25 @@ export class DialoguePlayer {
                     commands: nodeData.commands || [],
                     choices: [],
                     is_exit_node: nodeData.is_exit_node || false,
+                    is_end: nodeData.is_end || false,
                     is_entry_target: nodeData.is_entry_target || false,
-                    entry_groups: nodeData.entry_groups || []
+                    entry_groups: nodeData.entry_groups || [],
+                    triggers: nodeData.triggers || []
                 };
+
+                // Build trigger map: target -> list of {type, target, condition, nodeId}
+                for (const trigger of (nodeData.triggers || [])) {
+                    const key = trigger.target;  // e.g., "officer"
+                    if (!this.triggers[key]) {
+                        this.triggers[key] = [];
+                    }
+                    this.triggers[key].push({
+                        type: trigger.type,
+                        target: trigger.target,
+                        condition: trigger.condition,
+                        nodeId: nodeData.id
+                    });
+                }
             }
 
             // Add choices from edges
@@ -208,16 +227,25 @@ export class DialoguePlayer {
         this.modal = document.createElement('div');
         this.modal.className = 'play-modal';
 
-        // Build entry group selector if entries exist
+        // Build NPC selector from triggers (@talk:npc) or legacy entries
+        // Get unique talk trigger targets (NPCs you can talk to)
+        const talkTargets = Object.keys(this.triggers).filter(target => {
+            // Only include @talk triggers, not @event triggers
+            return this.triggers[target].some(t => t.type === 'talk');
+        });
         const entryNames = Object.keys(this.entries);
+
+        // Combine both sources, preferring new triggers
+        const npcList = [...new Set([...talkTargets, ...entryNames])];
+
         let entrySelector = '';
-        if (entryNames.length > 0) {
+        if (npcList.length > 0) {
             entrySelector = `
                 <div class="play-entry-selector">
                     <label>Talk to:</label>
                     <select class="entry-group-select">
                         <option value="">-- Select NPC --</option>
-                        ${entryNames.map(name => `<option value="${name}">${name}</option>`).join('')}
+                        ${npcList.map(name => `<option value="${name}">${name}</option>`).join('')}
                     </select>
                     <button class="btn btn-sm btn-success talk-btn" disabled>Talk</button>
                 </div>
@@ -318,7 +346,7 @@ export class DialoguePlayer {
             tab.addEventListener('click', (e) => this.switchStateTab(e.target.dataset.tab));
         });
 
-        // Entry group selector (if present)
+        // NPC selector (triggers or legacy entry groups)
         const entrySelect = this.modal.querySelector('.entry-group-select');
         const talkBtn = this.modal.querySelector('.talk-btn');
         if (entrySelect && talkBtn) {
@@ -327,7 +355,13 @@ export class DialoguePlayer {
             });
             talkBtn.addEventListener('click', () => {
                 if (entrySelect.value) {
-                    this.startFromEntryGroup(entrySelect.value);
+                    const target = entrySelect.value;
+                    // Prefer new trigger system, fall back to legacy entries
+                    if (this.triggers[target] && this.triggers[target].some(t => t.type === 'talk')) {
+                        this.startFromTrigger(target);
+                    } else if (this.entries[target]) {
+                        this.startFromEntryGroup(target);
+                    }
                 }
             });
         }
@@ -381,15 +415,61 @@ export class DialoguePlayer {
     }
 
     /**
+     * Start dialogue from a trigger (e.g., @talk:officer)
+     * Evaluates conditions in REVERSE order (last defined = highest priority)
+     * This allows natural dialogue progression: later nodes in file = later in story
+     */
+    startFromTrigger(triggerTarget) {
+        const triggerRoutes = this.triggers[triggerTarget];
+        if (!triggerRoutes || triggerRoutes.length === 0) {
+            this.app.showNotification(`No triggers found for "${triggerTarget}"`, 'error');
+            return;
+        }
+
+        this.currentTrigger = triggerTarget;
+
+        // Check triggers in REVERSE order (stack behavior)
+        // Later nodes in the file are checked first (more advanced conversation states)
+        for (let i = triggerRoutes.length - 1; i >= 0; i--) {
+            const trigger = triggerRoutes[i];
+            if (!trigger.condition || this.state.evaluateCondition(trigger.condition)) {
+                // Found a matching trigger!
+                const triggerType = trigger.type === 'talk' ? '💬' : '⚡';
+                this.app.showNotification(`${triggerType} ${triggerTarget} → [${trigger.nodeId}]`, 'success');
+
+                // Clear dialogue area for new conversation
+                const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
+                scrollArea.innerHTML = '';
+
+                // Reset visited path for this conversation
+                this.visitedPath = [trigger.nodeId];
+                this.app.highlightPath(this.visitedPath, trigger.nodeId);
+
+                // Play from the matched node
+                this.playNode(trigger.nodeId);
+                return;
+            }
+        }
+
+        // No conditions matched - NPC has nothing to say
+        this.app.showNotification(`${triggerTarget} has nothing to say (no conditions matched)`, 'warning');
+    }
+
+    /**
      * Check if current node is an exit node
-     * Either marked in the node data or listed in the active entry group's exits
+     * Either marked with @end, is_exit_node, or listed in an entry group's exits
      */
     isExitNode(nodeId) {
-        // Check if node is marked as exit in the dialogue data
         const node = this.dialogueData[nodeId];
-        if (node && node.is_exit_node) return true;
+        if (!node) return false;
 
-        // Also check if it's an exit for the current entry group
+        // Check for new @end marker
+        if (node.is_end) return true;
+
+        // Check legacy is_exit_node flag
+        if (node.is_exit_node) return true;
+
+        // Also check if it's an exit for the current entry group (legacy)
         if (this.currentEntryGroup) {
             const entryGroup = this.entries[this.currentEntryGroup];
             if (entryGroup && entryGroup.exits.includes(nodeId)) return true;
@@ -399,7 +479,7 @@ export class DialoguePlayer {
     }
 
     /**
-     * Show the exit point UI when reaching an exit node
+     * Show the exit point UI when reaching an exit node (@end)
      */
     async showExitPoint() {
         const scrollArea = this.modal.querySelector('.play-dialogue-scroll');
@@ -407,21 +487,34 @@ export class DialoguePlayer {
 
         choicesArea.classList.add('hidden');
 
-        // Find which entry group(s) this node is an exit for
+        // Find available triggers to "talk again"
+        // Priority: current trigger > triggers from current node > legacy entry groups
         const node = this.dialogueData[this.currentNode];
-        let exitForGroups = [];
-        if (node && node.entry_groups) {
-            exitForGroups = node.entry_groups;
+        let talkAgainTarget = null;
+        let talkAgainType = 'trigger';  // 'trigger' or 'entry'
+
+        // First check if we have a current trigger
+        if (this.currentTrigger && this.triggers[this.currentTrigger]) {
+            talkAgainTarget = this.currentTrigger;
         }
-        // Also check all entries for this node in their exits list
-        for (const [name, group] of Object.entries(this.entries)) {
-            if (group.exits.includes(this.currentNode) && !exitForGroups.includes(name)) {
-                exitForGroups.push(name);
+        // Then check node's triggers
+        else if (node && node.triggers && node.triggers.length > 0) {
+            talkAgainTarget = node.triggers[0].target;
+        }
+        // Legacy: check entry groups
+        else if (this.currentEntryGroup) {
+            talkAgainTarget = this.currentEntryGroup;
+            talkAgainType = 'entry';
+        } else {
+            // Check all entries for this node
+            for (const [name, group] of Object.entries(this.entries)) {
+                if (group.exits.includes(this.currentNode)) {
+                    talkAgainTarget = name;
+                    talkAgainType = 'entry';
+                    break;
+                }
             }
         }
-
-        const hasEntryGroup = this.currentEntryGroup || exitForGroups.length > 0;
-        const talkAgainGroup = this.currentEntryGroup || (exitForGroups.length > 0 ? exitForGroups[0] : null);
 
         const exitEl = document.createElement('div');
         exitEl.className = 'dialogue-exit-point';
@@ -429,7 +522,7 @@ export class DialoguePlayer {
             <div class="exit-title">💬 Conversation Ended</div>
             <div class="exit-info">Talk to other NPCs or edit game state to continue.</div>
             <div class="exit-buttons">
-                ${talkAgainGroup ? `<button class="btn btn-primary talk-again-btn">🔄 Talk Again (${talkAgainGroup})</button>` : ''}
+                ${talkAgainTarget ? `<button class="btn btn-primary talk-again-btn">🔄 Talk Again (${talkAgainTarget})</button>` : ''}
                 <button class="btn btn-secondary continue-btn">▶️ Continue Flow</button>
             </div>
         `;
@@ -437,11 +530,15 @@ export class DialoguePlayer {
         scrollArea.appendChild(exitEl);
         scrollArea.scrollTop = scrollArea.scrollHeight;
 
-        // Talk again - re-evaluate entry conditions
+        // Talk again - re-evaluate trigger/entry conditions
         const talkAgainBtn = exitEl.querySelector('.talk-again-btn');
-        if (talkAgainBtn && talkAgainGroup) {
+        if (talkAgainBtn && talkAgainTarget) {
             talkAgainBtn.addEventListener('click', () => {
-                this.startFromEntryGroup(talkAgainGroup);
+                if (talkAgainType === 'trigger') {
+                    this.startFromTrigger(talkAgainTarget);
+                } else {
+                    this.startFromEntryGroup(talkAgainTarget);
+                }
             });
         }
 

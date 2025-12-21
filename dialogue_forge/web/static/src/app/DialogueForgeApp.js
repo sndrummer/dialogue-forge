@@ -338,6 +338,16 @@ export class DialogueForgeApp {
                         return 'builtin';
                     }
 
+                    // Triggers @talk:, @event:, @end
+                    if (stream.match(/^@(talk|event):\w+/)) {
+                        state.afterString = false;
+                        return 'variable-2';  // Teal/cyan color
+                    }
+                    if (stream.match(/^@end/)) {
+                        state.afterString = false;
+                        return 'variable-3';  // Different color for end
+                    }
+
                     // Choices ->
                     if (stream.match(/^->/)) {
                         state.afterString = false;

@@ -31,23 +31,11 @@ narrator: Narrator
 *set peng_relationship = 0
 
 # ==========================================
-# ENTRY GROUPS - NPC conversation routing
-# ==========================================
-
-[entry:officer]
-# When player talks to officer, route based on gear status
-has_item:fire_nation_gear -> ready
-tutorial_equipment_shown -> get_equipment
--> start
-
-# Exit markers - dialogue pauses, returns to gameplay
-<- get_equipment
-
-# ==========================================
 # SCENE 1: SHIP INTERIOR - AWAKENING
 # ==========================================
 
 [start]
+@talk:officer {!tutorial_equipment_shown}
 # Player awakens in Fire Nation ship bunkroom
 officer: "On your feet, recruit! The Fire Lord doesn't tolerate weakness.
     Move it, or I'll give you a reason to jump out of that bunk!"
@@ -111,11 +99,15 @@ officer: "Good. Now get moving, recruit!"
 -> get_equipment
 
 [get_equipment]
+@talk:officer {tutorial_equipment_shown}
 officer: "Your gear's in that locker. Suit up fast - we attack when the comet reaches its peak."
 *set tutorial_equipment_shown = true
 narrator: "Open your inventory and equip the Fire Nation uniform, bending-focused utility belt, and protective armor."
-# EXIT: Dialogue ends here, player goes to gameplay to equip gear
-# When player talks to officer again with fire_nation_gear equipped, routes to [ready]
+@end
+
+[ready_prompt]
+@talk:officer {has_item:fire_nation_gear}
+-> ready: "Ready, sir."
 
 [ready]
 officer: "About time. And remember, the comet will provide you incredible bending

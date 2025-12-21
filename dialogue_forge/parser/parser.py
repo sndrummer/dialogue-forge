@@ -9,6 +9,17 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
+class Trigger:
+    """Represents a trigger that starts dialogue at this node"""
+
+    trigger_type: str  # "talk" or "event"
+    target: str  # NPC id for talk, event name for event
+    condition: Optional[str] = None
+    line_number: int = 0
+
+
+# Legacy dataclasses - kept for backwards compatibility during transition
+@dataclass
 class EntryRoute:
     """Represents a conditional entry route within an entry group"""
 
@@ -56,6 +67,8 @@ class DialogueNode:
     lines: List[DialogueLine] = field(default_factory=list)
     choices: List[Choice] = field(default_factory=list)
     commands: List[str] = field(default_factory=list)
+    triggers: List[Trigger] = field(default_factory=list)  # @talk: and @event: triggers
+    is_end: bool = False  # True if node has @end marker
     line_number: int = 0
 
 
@@ -597,6 +610,26 @@ class DialogueParser:
 
             stripped = line.strip()
 
+            # Parse trigger (@talk:, @event:) or end marker (@end)
+            if stripped.startswith("@"):
+                if stripped == "@end":
+                    primary_node.is_end = True
+                    i += 1
+                    continue
+                elif stripped.startswith("@talk:") or stripped.startswith("@event:"):
+                    trigger = self._parse_trigger(stripped, i + 1)
+                    if trigger:
+                        primary_node.triggers.append(trigger)
+                        self._track_items_and_companions(trigger.condition or "")
+                    i += 1
+                    continue
+                else:
+                    self.dialogue.warnings.append(
+                        f"Line {i + 1}: Unknown trigger type: {stripped}. Expected @talk:, @event:, or @end"
+                    )
+                    i += 1
+                    continue
+
             # Parse command/effect
             if stripped.startswith("*"):
                 cmd_text = stripped[1:].strip()
@@ -699,11 +732,62 @@ class DialogueParser:
                 lines=primary_node.lines,  # Share the list reference (read-only expected)
                 choices=primary_node.choices,  # Share the list reference (read-only expected)
                 commands=primary_node.commands,  # Share the list reference (read-only expected)
+                triggers=primary_node.triggers,  # Share triggers
+                is_end=primary_node.is_end,  # Share is_end
                 line_number=primary_node.line_number,
             )
             self.dialogue.nodes[node_id] = alias_node
 
         return i
+
+    def _parse_trigger(self, line: str, line_number: int) -> Optional[Trigger]:
+        """Parse a trigger line (@talk: or @event:)
+
+        Format:
+            @talk:officer
+            @talk:officer {condition}
+            @event:enter_temple
+            @event:pickup_item {has_item:key}
+        """
+        # Determine trigger type
+        if line.startswith("@talk:"):
+            trigger_type = "talk"
+            rest = line[6:].strip()
+        elif line.startswith("@event:"):
+            trigger_type = "event"
+            rest = line[7:].strip()
+        else:
+            return None
+
+        # Extract target and optional condition
+        condition = None
+        target = rest
+
+        if "{" in rest:
+            brace_start = rest.index("{")
+            target = rest[:brace_start].strip()
+            condition = rest[brace_start:].strip()
+            # Remove curly braces
+            if condition.startswith("{") and condition.endswith("}"):
+                condition = condition[1:-1].strip()
+
+            # Validate condition syntax
+            if condition:
+                condition_warnings = self.validate_condition_syntax(condition, line_number)
+                self.dialogue.warnings.extend(condition_warnings)
+
+        if not target:
+            self.dialogue.errors.append(
+                f"Line {line_number}: Trigger missing target: {line}"
+            )
+            return None
+
+        return Trigger(
+            trigger_type=trigger_type,
+            target=target,
+            condition=condition,
+            line_number=line_number,
+        )
 
     def _parse_choice(self, lines: List[str], start_index: int, node: DialogueNode) -> int:
         """Parse a choice line, returns the next line index to process"""
@@ -888,11 +972,16 @@ class DialogueParser:
         if self.dialogue.start_node:
             to_visit.append(self.dialogue.start_node)
 
-        # Add all entry group targets as starting points
+        # Add all entry group targets as starting points (legacy support)
         for entry_group in self.dialogue.entries.values():
             for route in entry_group.routes:
                 if route.target not in to_visit:
                     to_visit.append(route.target)
+
+        # Add all nodes with triggers as starting points (new syntax)
+        for node_id, node in self.dialogue.nodes.items():
+            if node.triggers and node_id not in to_visit:
+                to_visit.append(node_id)
 
         while to_visit:
             current = to_visit.pop(0)
@@ -925,12 +1014,18 @@ class DialogueParser:
         total_entry_routes = sum(len(e.routes) for e in self.dialogue.entries.values())
         total_exits = sum(len(e.exits) for e in self.dialogue.entries.values())
 
+        # Count new trigger system
+        total_triggers = sum(len(node.triggers) for node in self.dialogue.nodes.values())
+        total_end_nodes = sum(1 for node in self.dialogue.nodes.values() if node.is_end)
+
         return {
             "characters": len(self.dialogue.characters),
             "nodes": len(self.dialogue.nodes),
             "entry_groups": len(self.dialogue.entries),
             "entry_routes": total_entry_routes,
             "exit_nodes": total_exits,
+            "triggers": total_triggers,
+            "end_nodes": total_end_nodes,
             "dialogue_lines": total_lines,
             "choices": total_choices,
             "commands": total_commands,

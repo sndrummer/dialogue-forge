@@ -1,4 +1,4 @@
-# Test file for entry/exit parsing
+# Test file for trigger/exit parsing (@talk, @event, @end)
 
 [characters]
 officer: Fire Nation Officer
@@ -8,22 +8,8 @@ recruit: Fire Nation Recruit
 *set talked_before = false
 *set equipment_equipped = false
 
-[entry:officer]
-# Entry routes - first match wins
-equipment_equipped -> equip_items
-talked_before && !equipment_equipped -> get_equipment
--> start
-
-# Exit markers
-<- equip_items
-<- ship_deck
-
-[entry:recruit]
-asked_about_comet -> talk_recruit_2
--> talk_recruit_1
-<- exploration_phase
-
 [start]
+@talk:officer
 officer: "On your feet, recruit!"
 -> yes_sir: "Yes, sir!"
 -> confused: "What?"
@@ -39,27 +25,32 @@ officer: "Wake up, soldier!"
 -> get_equipment
 
 [get_equipment]
+@talk:officer {talked_before && !equipment_equipped}
 officer: "Your gear's in that locker."
 -> equip_items: "[Equip the items]"
 
 [equip_items]
+@talk:officer {equipment_equipped}
 *set equipment_equipped = true
 officer: "About time. Get to the deck."
--> ship_deck
+@end
 
 [ship_deck]
 officer: "We approach the Southern Air Temple!"
--> END
+@end
 
 [talk_recruit_1]
+@talk:recruit
 recruit: "Hey, how're you feeling about the invasion?"
 *set asked_about_comet = true
--> exploration_phase
+@end
 
 [talk_recruit_2]
+@talk:recruit {asked_about_comet}
 recruit: "Can't wait to show what I've got!"
--> exploration_phase
+@end
 
 [exploration_phase]
+@event:exploration_start
 recruit: "Good luck out there!"
 -> END

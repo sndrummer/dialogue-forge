@@ -195,6 +195,10 @@
                         <tr><td><code>-> END</code></td><td>End conversation</td></tr>
                         <tr><td><code>{condition}</code></td><td>Condition on choice</td></tr>
                         <tr><td><code>*command</code></td><td>Game command</td></tr>
+                        <tr><td><code>@talk:npc</code></td><td>Trigger when talking to NPC</td></tr>
+                        <tr><td><code>@talk:npc {cond}</code></td><td>Conditional talk trigger</td></tr>
+                        <tr><td><code>@event:name</code></td><td>Trigger on game event</td></tr>
+                        <tr><td><code>@end</code></td><td>Exit to gameplay</td></tr>
                         <tr><td><code># comment</code></td><td>Comment (ignored)</td></tr>
                     </table>
                 </section>
@@ -371,6 +375,34 @@ peng: "Thank you!" [grateful, tearful] {saved_peng}</code></pre>
 *start_combat bandit_encounter
 *play_sound door_creak</code></pre>
                     <p class="guide-tip">💡 You can create custom commands like <code>*start_combat</code> — your game decides how to handle them.</p>
+                </section>
+
+                <!-- Triggers -->
+                <section class="guide-section">
+                    <h3>Triggers &amp; Exits</h3>
+                    <p>Use triggers to define how dialogue is started and when it ends:</p>
+                    <pre><code># @talk - When player talks to an NPC
+[greet_player]
+@talk:officer
+officer: "Welcome, recruit!"
+-> get_orders: "Yes, sir!"
+
+# @talk with condition - Only when condition is met
+[report_in]
+@talk:officer {has_item:uniform}
+-> ready: "Ready for duty, sir."
+
+# @event - Custom game events
+[enter_temple]
+@event:enter_temple
+narrator: "The ancient temple looms before you..."
+
+# @end - Conversation ends, return to gameplay
+[equip_gear]
+@talk:officer {!has_item:uniform}
+officer: "Get your gear from the locker."
+@end</code></pre>
+                    <p class="guide-tip">💡 Multiple @talk triggers for the same NPC are evaluated in order — first matching condition wins. Use @end to exit dialogue and let the player explore.</p>
                 </section>
 
                 <!-- Stacked Nodes -->

@@ -618,8 +618,17 @@ def create_app(dialogues_root=None):
                     "commands_count": len(node.commands),
                     "is_start": node_id == dialogue.start_node,
                     "is_entry_target": node_id in entry_targets,
-                    "is_exit_node": node_id in exit_nodes,
+                    "is_exit_node": node_id in exit_nodes or node.is_end,  # Include new @end nodes
+                    "is_end": node.is_end,  # New @end marker
                     "entry_groups": entry_groups_for_node.get(node_id, []),
+                    "triggers": [
+                        {
+                            "type": t.trigger_type,
+                            "target": t.target,
+                            "condition": t.condition,
+                        }
+                        for t in node.triggers
+                    ],
                     "lines": [
                         {
                             "speaker": line.speaker,

@@ -11,6 +11,7 @@ from .parser import (
     DialogueParser,
     EntryGroup,
     EntryRoute,
+    Trigger,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "Choice",
     "EntryGroup",
     "EntryRoute",
+    "Trigger",
 ]

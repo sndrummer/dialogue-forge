@@ -7,6 +7,7 @@ merchant: Merchant
 narrator: Narrator
 
 [start]
+@talk:npc
 narrator: "Testing all dialogue features..."
 *set test_started = true
 *add xp = 10
@@ -78,4 +79,22 @@ narrator: "You performed an action."
 
 [mixed_choice]
 hero: "Conditional choice worked!"
+-> test_triggers
+
+# ============================================================
+# Triggers Test Section
+# @talk, @event, and @end for conversation flow control
+# ============================================================
+[test_triggers]
+narrator: "Testing triggers..."
+-> trigger_end_test
+
+[trigger_end_test]
+@talk:merchant {has_item:sword}
+merchant: "That's a fine blade you've got!"
+@end
+
+[event_trigger_test]
+@event:shop_entered
+merchant: "Welcome to my shop!"
 -> END
