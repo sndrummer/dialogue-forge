@@ -247,7 +247,8 @@ def find_valid_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[s
     Returns (path, final_state) or (None, None) if unreachable.
 
     The algorithm simulates game state as it traverses, only following
-    choices whose conditions are satisfied.
+    choices whose conditions are satisfied. When hitting @end nodes,
+    it can "jump" via triggers to disconnected parts of the dialogue.
     """
     # Create initial state and execute [state] section commands
     initial_state = WebGameState()
@@ -266,17 +267,23 @@ def find_valid_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[s
     if target_node not in dialogue.nodes and target_node != "END":
         return None, None
 
-    # BFS: queue contains (current_node, path, state)
+    # Build a map of all trigger entry points for quick lookup
+    trigger_nodes = []
+    for node_id, node in dialogue.nodes.items():
+        if node.triggers:
+            trigger_nodes.append((node_id, node))
+
+    # BFS: queue contains (current_node, path, state, used_triggers)
     # Execute commands at start node
     if dialogue.start_node in dialogue.nodes:
         for cmd in dialogue.nodes[dialogue.start_node].commands:
             initial_state.execute_command(cmd)
 
-    queue = deque([(dialogue.start_node, [dialogue.start_node], initial_state)])
+    queue = deque([(dialogue.start_node, [dialogue.start_node], initial_state, frozenset())])
     visited = {(dialogue.start_node, frozenset(), frozenset(), frozenset(initial_state.variables.items()))}
 
     while queue:
-        current_node, path, state = queue.popleft()
+        current_node, path, state, used_triggers = queue.popleft()
 
         if current_node == target_node:
             return path, state
@@ -317,10 +324,40 @@ def find_valid_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[s
 
             if state_sig not in visited:
                 visited.add(state_sig)
-                queue.append((next_node, path + [next_node], new_state))
+                queue.append((next_node, path + [next_node], new_state, used_triggers))
+
+        # If this is an @end node, we can "jump" to any trigger node
+        if node.is_end:
+            for trigger_node_id, trigger_node in trigger_nodes:
+                # Don't revisit trigger nodes we've already used
+                if trigger_node_id in used_triggers:
+                    continue
+
+                for trigger in trigger_node.triggers:
+                    # Create a new state and grant the trigger's condition
+                    new_state = state.copy()
+                    if trigger.condition:
+                        new_state.grant_condition(trigger.condition)
+
+                    # Execute commands at the trigger node
+                    for cmd in trigger_node.commands:
+                        new_state.execute_command(cmd)
+
+                    # Create state signature for visited check
+                    state_sig = (
+                        trigger_node_id,
+                        frozenset(new_state.inventory),
+                        frozenset(new_state.companions),
+                        frozenset(new_state.variables.items()),
+                    )
+
+                    if state_sig not in visited:
+                        visited.add(state_sig)
+                        new_used = used_triggers | {trigger_node_id}
+                        queue.append((trigger_node_id, path + [trigger_node_id], new_state, new_used))
+                    break  # Only need one trigger per node
 
     # No path found - target might be unreachable
-    # Return path to target anyway with empty state (for testing purposes)
     return None, None
 
 
@@ -331,6 +368,7 @@ def find_random_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[
 
     Unlike BFS, this shuffles choices at each node to explore a random path.
     Equal probability for each valid choice at every branch point.
+    Supports jumping via triggers at @end nodes.
     """
     initial_state = WebGameState()
     for cmd in dialogue.initial_state:
@@ -346,17 +384,23 @@ def find_random_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[
     if target_node not in dialogue.nodes and target_node != "END":
         return None, None
 
+    # Build a map of all trigger entry points
+    trigger_nodes = []
+    for node_id, node in dialogue.nodes.items():
+        if node.triggers:
+            trigger_nodes.append((node_id, node))
+
     # Execute commands at start node
     if dialogue.start_node in dialogue.nodes:
         for cmd in dialogue.nodes[dialogue.start_node].commands:
             initial_state.execute_command(cmd)
 
-    # Randomized DFS using a stack
-    stack = [(dialogue.start_node, [dialogue.start_node], initial_state)]
+    # Randomized DFS using a stack: (current_node, path, state, used_triggers)
+    stack = [(dialogue.start_node, [dialogue.start_node], initial_state, frozenset())]
     visited = {(dialogue.start_node, frozenset(), frozenset(), frozenset(initial_state.variables.items()))}
 
     while stack:
-        current_node, path, state = stack.pop()
+        current_node, path, state, used_triggers = stack.pop()
 
         if current_node == target_node:
             return path, state
@@ -366,29 +410,50 @@ def find_random_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[
 
         node = dialogue.nodes[current_node]
 
-        # Get valid choices and shuffle them for randomness
-        valid_choices = []
+        # Collect all possible next states (choices + trigger jumps)
+        next_states = []
+
+        # Get valid choices
         for choice in node.choices:
             if state.evaluate_condition(choice.condition):
-                valid_choices.append(choice)
+                next_node = choice.target
 
-        random.shuffle(valid_choices)
+                if next_node == "END":
+                    if target_node == "END":
+                        return path + ["END"], state
+                    continue
 
-        for choice in valid_choices:
-            next_node = choice.target
+                if next_node not in dialogue.nodes:
+                    continue
 
-            if next_node == "END":
-                if target_node == "END":
-                    return path + ["END"], state
-                continue
+                new_state = state.copy()
+                for cmd in dialogue.nodes[next_node].commands:
+                    new_state.execute_command(cmd)
 
-            if next_node not in dialogue.nodes:
-                continue
+                next_states.append((next_node, new_state, used_triggers))
 
-            new_state = state.copy()
-            for cmd in dialogue.nodes[next_node].commands:
-                new_state.execute_command(cmd)
+        # If this is an @end node, add trigger jumps as options
+        if node.is_end:
+            for trigger_node_id, trigger_node in trigger_nodes:
+                if trigger_node_id in used_triggers:
+                    continue
 
+                for trigger in trigger_node.triggers:
+                    new_state = state.copy()
+                    if trigger.condition:
+                        new_state.grant_condition(trigger.condition)
+
+                    for cmd in trigger_node.commands:
+                        new_state.execute_command(cmd)
+
+                    new_used = used_triggers | {trigger_node_id}
+                    next_states.append((trigger_node_id, new_state, new_used))
+                    break  # Only need one trigger per node
+
+        # Shuffle for randomness
+        random.shuffle(next_states)
+
+        for next_node, new_state, new_used in next_states:
             state_sig = (
                 next_node,
                 frozenset(new_state.inventory),
@@ -398,7 +463,7 @@ def find_random_path_to_node(dialogue, target_node: str) -> Tuple[Optional[List[
 
             if state_sig not in visited:
                 visited.add(state_sig)
-                stack.append((next_node, path + [next_node], new_state))
+                stack.append((next_node, path + [next_node], new_state, new_used))
 
     return None, None
 
@@ -412,6 +477,7 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
     - Nodes with more content (lines + choices)
     - Longer paths (depth-first naturally explores deeper)
     - Random selection among equally-weighted choices
+    Supports jumping via triggers at @end nodes.
     """
     initial_state = WebGameState()
     for cmd in dialogue.initial_state:
@@ -427,13 +493,20 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
     if target_node not in dialogue.nodes and target_node != "END":
         return None, None
 
+    # Build a map of all trigger entry points
+    trigger_nodes = []
+    for node_id, node in dialogue.nodes.items():
+        if node.triggers:
+            trigger_nodes.append((node_id, node))
+
     if dialogue.start_node in dialogue.nodes:
         for cmd in dialogue.nodes[dialogue.start_node].commands:
             initial_state.execute_command(cmd)
 
     # Track all valid paths found, then return the longest
     all_paths = []
-    stack = [(dialogue.start_node, [dialogue.start_node], initial_state)]
+    # Stack: (current_node, path, state, used_triggers)
+    stack = [(dialogue.start_node, [dialogue.start_node], initial_state, frozenset())]
     visited = {(dialogue.start_node, frozenset(), frozenset(), frozenset(initial_state.variables.items()))}
 
     # Limit iterations to prevent infinite loops in large graphs
@@ -442,7 +515,7 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
 
     while stack and iterations < max_iterations:
         iterations += 1
-        current_node, path, state = stack.pop()
+        current_node, path, state, used_triggers = stack.pop()
 
         if current_node == target_node:
             all_paths.append((path, state))
@@ -456,8 +529,10 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
 
         node = dialogue.nodes[current_node]
 
+        # Collect all scored next states
+        scored_next = []
+
         # Score and sort choices to prefer "interesting" paths
-        scored_choices = []
         for choice in node.choices:
             if not state.evaluate_condition(choice.condition):
                 continue
@@ -479,21 +554,38 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
                 # Add randomness to break ties and vary paths
                 score += random.random() * 3
 
-            scored_choices.append((score, choice))
+                new_state = state.copy()
+                for cmd in next_node_data.commands:
+                    new_state.execute_command(cmd)
+
+                scored_next.append((score, next_node, new_state, used_triggers))
+
+        # If this is an @end node, add trigger jumps with higher scores (prefer exploring)
+        if node.is_end:
+            for trigger_node_id, trigger_node in trigger_nodes:
+                if trigger_node_id in used_triggers:
+                    continue
+
+                for trigger in trigger_node.triggers:
+                    new_state = state.copy()
+                    if trigger.condition:
+                        new_state.grant_condition(trigger.condition)
+
+                    for cmd in trigger_node.commands:
+                        new_state.execute_command(cmd)
+
+                    # Higher score for trigger jumps (more exploration)
+                    score = len(trigger_node.lines) * 2 + len(trigger_node.choices) + 5
+                    score += random.random() * 3
+
+                    new_used = used_triggers | {trigger_node_id}
+                    scored_next.append((score, trigger_node_id, new_state, new_used))
+                    break  # Only need one trigger per node
 
         # Sort by score (lower first since we pop from end of stack)
-        scored_choices.sort(key=lambda x: x[0])
+        scored_next.sort(key=lambda x: x[0])
 
-        for _, choice in scored_choices:
-            next_node = choice.target
-
-            if next_node == "END" or next_node not in dialogue.nodes:
-                continue
-
-            new_state = state.copy()
-            for cmd in dialogue.nodes[next_node].commands:
-                new_state.execute_command(cmd)
-
+        for _, next_node, new_state, new_used in scored_next:
             state_sig = (
                 next_node,
                 frozenset(new_state.inventory),
@@ -503,7 +595,7 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
 
             if state_sig not in visited:
                 visited.add(state_sig)
-                stack.append((next_node, path + [next_node], new_state))
+                stack.append((next_node, path + [next_node], new_state, new_used))
 
     if not all_paths:
         return None, None
