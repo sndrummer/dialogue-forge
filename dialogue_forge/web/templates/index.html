@@ -182,23 +182,26 @@
                 <section class="guide-section guide-reference">
                     <h3>Quick Reference</h3>
                     <table class="guide-table">
+                        <tr><th colspan="2" style="text-align:left; background:#2a2a2a; color:#ffc107;">Entry &amp; Exit (Core RPG Pattern)</th></tr>
+                        <tr><td><code>@talk:npc</code></td><td>Start dialogue when player talks to NPC</td></tr>
+                        <tr><td><code>@talk:npc {cond}</code></td><td>Conditional talk trigger</td></tr>
+                        <tr><td><code>@end</code></td><td>Exit to gameplay (walk around, explore)</td></tr>
+                        <tr><td><code>@event:name</code></td><td>Trigger from game event (cutscene, area)</td></tr>
+                        <tr><th colspan="2" style="text-align:left; background:#2a2a2a;">Structure</th></tr>
                         <tr><td><code>[characters]</code></td><td>Start character definitions</td></tr>
                         <tr><td><code>id: Name</code></td><td>Define a character</td></tr>
                         <tr><td><code>[state]</code></td><td>Initialize game state for scene</td></tr>
                         <tr><td><code>[node_name]</code></td><td>Define a dialogue node</td></tr>
+                        <tr><th colspan="2" style="text-align:left; background:#2a2a2a;">Dialogue</th></tr>
                         <tr><td><code>speaker: "text"</code></td><td>Dialogue line</td></tr>
                         <tr><td><code>speaker: "text" [tag]</code></td><td>Line with tag (optional)</td></tr>
-                        <tr><td><code>speaker: "long<br>  text"</code></td><td>Multi-line (unclosed quote)</td></tr>
                         <tr><td><code>-> target: "text"</code></td><td>Player choice</td></tr>
                         <tr><td><code>-> target</code></td><td>Auto-transition (GOTO)</td></tr>
                         <tr><td><code>-> target {cond}</code></td><td>Conditional GOTO</td></tr>
-                        <tr><td><code>-> END</code></td><td>End conversation</td></tr>
-                        <tr><td><code>{condition}</code></td><td>Condition on choice</td></tr>
-                        <tr><td><code>*command</code></td><td>Game command</td></tr>
-                        <tr><td><code>@talk:npc</code></td><td>Trigger when talking to NPC</td></tr>
-                        <tr><td><code>@talk:npc {cond}</code></td><td>Conditional talk trigger</td></tr>
-                        <tr><td><code>@event:name</code></td><td>Trigger on game event</td></tr>
-                        <tr><td><code>@end</code></td><td>Exit to gameplay</td></tr>
+                        <tr><td><code>-> END</code></td><td>End conversation (scene over)</td></tr>
+                        <tr><th colspan="2" style="text-align:left; background:#2a2a2a;">Conditions &amp; Commands</th></tr>
+                        <tr><td><code>{condition}</code></td><td>Condition on choice/line</td></tr>
+                        <tr><td><code>*command</code></td><td>Game command (*set, *give_item, etc.)</td></tr>
                         <tr><td><code># comment</code></td><td>Comment (ignored)</td></tr>
                     </table>
                 </section>
@@ -216,30 +219,85 @@ npc: "Good morning!"</code></pre>
                 <!-- What is DLG -->
                 <section class="guide-section">
                     <h3>What is DLG?</h3>
-                    <p>DLG is a simple, human-readable format for writing branching dialogue. It's designed to be easy to write in any text editor while supporting complex game interactions.</p>
+                    <p>DLG is a simple, human-readable format for writing branching dialogue for RPGs and adventure games. Use <code>@talk</code> to define when the player can talk to NPCs, and <code>@end</code> to return control to gameplay.</p>
+                </section>
+
+                <!-- NPC Conversations (the core pattern) -->
+                <section class="guide-section">
+                    <h3>NPC Conversations</h3>
+                    <p>The core RPG pattern: <code>@talk</code> defines when dialogue triggers, <code>@end</code> exits back to gameplay.</p>
+                    <pre><code>[characters]
+hero: Player
+officer: Fire Nation Officer
+recruit: Recruit
+
+# ==========================================
+# OFFICER - Multiple conversations based on state
+# ==========================================
+
+[officer_intro]
+@talk:officer {!talked_to_officer}
+officer: "On your feet, recruit!"
+-> yes_sir: "Yes, sir!"
+-> confused: "Where are we?"
+
+[yes_sir]
+*set talked_to_officer = true
+officer: "Your gear's in that locker. Suit up!"
+@end
+
+[confused]
+*set talked_to_officer = true
+officer: "Wake up! Get your gear from the locker!"
+@end
+
+[officer_ready]
+@talk:officer {talked_to_officer && has_item:uniform}
+officer: "About time. Get to the deck."
+-> deck
+
+[officer_waiting]
+@talk:officer {talked_to_officer && !has_item:uniform}
+officer: "Still no gear? The locker, recruit!"
+@end
+
+# ==========================================
+# RECRUIT - Simple conversation
+# ==========================================
+
+[talk_recruit]
+@talk:recruit
+recruit: "Nervous about the mission?"
+@end</code></pre>
+                    <p class="guide-tip">💡 <strong>@talk triggers</strong> are evaluated in order - the <strong>last matching one</strong> wins. Put your most specific conditions at the bottom!</p>
                 </section>
 
                 <!-- Basic Structure -->
                 <section class="guide-section">
-                    <h3>Basic Structure</h3>
-                    <p>Every DLG file has three optional sections: <strong>characters</strong>, <strong>state</strong>, and <strong>nodes</strong>.</p>
-                    <pre><code># Characters go first
-[characters]
+                    <h3>File Structure</h3>
+                    <p>Every DLG file has three sections: <strong>characters</strong>, <strong>state</strong> (optional), and <strong>nodes</strong>.</p>
+                    <pre><code>[characters]
 hero: Player Name
 npc: Village Elder
-narrator: Narrator
 
-# Optional: initialize state for this scene
 [state]
 *set talked_before = false
-*set reputation = 0
-*give_item torch
+*set gold = 100
 
-# Then your dialogue nodes
 [start]
+@talk:npc
 npc: "Welcome, traveler!"
 -> greet: "Hello!"
--> leave: "Goodbye." -> END</code></pre>
+-> leave: "Goodbye."
+
+[greet]
+*set talked_before = true
+npc: "Nice to meet you!"
+@end
+
+[leave]
+npc: "Safe travels."
+@end</code></pre>
                 </section>
 
                 <!-- State Initialization -->
@@ -311,19 +369,34 @@ peng: "Thank you!" [grateful, tearful] {saved_peng}</code></pre>
                 <!-- Choices and Transitions -->
                 <section class="guide-section">
                     <h3>Choices &amp; Transitions</h3>
-                    <p>Use <code>-></code> to branch. The <strong>colon</strong> distinguishes player choices from automatic transitions:</p>
-                    <pre><code># PLAYER CHOICES (have colon + text)
+                    <p>Use <code>-></code> to branch. A <strong>colon</strong> means player choice, no colon means automatic GOTO:</p>
+                    <pre><code># PLAYER CHOICES (colon + text)
 -> next_node: "What the player says"
--> fight: [Attack the enemy]
+-> fight: "[Attack the enemy]"
 
 # AUTOMATIC TRANSITIONS (no colon = GOTO)
--> another_node          # unconditional
+-> another_node          # unconditional jump
 -> path_a {has_key}      # conditional GOTO
--> path_b {!has_key}     # like if/else branching
-
-# End the conversation
--> END</code></pre>
+-> path_b {!has_key}     # like if/else branching</code></pre>
                     <p class="guide-tip">💡 GOTOs are automatic — the player never sees them. Use them for branching logic based on game state!</p>
+                </section>
+
+                <!-- Exiting Dialogue -->
+                <section class="guide-section">
+                    <h3>Exiting Dialogue</h3>
+                    <p>Two ways to end dialogue — choose based on your game flow:</p>
+                    <pre><code># @end - Return to gameplay (exploration, walking around)
+# Use this in RPGs where player can talk to NPCs again
+[get_gear]
+officer: "Your gear's in the locker."
+@end  # Player can now walk around, open locker, talk again
+
+# -> END - End the conversation completely
+# Use for linear scenes or final farewells
+[final_goodbye]
+npc: "Farewell, hero. May we meet again."
+-> END  # Conversation is over</code></pre>
+                    <p class="guide-tip">💡 <strong>@end</strong> is for RPG exploration flow. <strong>-> END</strong> is for ending a scene. In most cases, prefer <code>@end</code>!</p>
                 </section>
 
                 <!-- Conditions -->
@@ -377,32 +450,22 @@ peng: "Thank you!" [grateful, tearful] {saved_peng}</code></pre>
                     <p class="guide-tip">💡 You can create custom commands like <code>*start_combat</code> — your game decides how to handle them.</p>
                 </section>
 
-                <!-- Triggers -->
+                <!-- Game Events -->
                 <section class="guide-section">
-                    <h3>Triggers &amp; Exits</h3>
-                    <p>Use triggers to define how dialogue is started and when it ends:</p>
-                    <pre><code># @talk - When player talks to an NPC
-[greet_player]
-@talk:officer
-officer: "Welcome, recruit!"
--> get_orders: "Yes, sir!"
-
-# @talk with condition - Only when condition is met
-[report_in]
-@talk:officer {has_item:uniform}
--> ready: "Ready for duty, sir."
-
-# @event - Custom game events
-[enter_temple]
+                    <h3>Game Events</h3>
+                    <p>Use <code>@event</code> to trigger dialogue from gameplay events (cutscenes, entering areas, etc.):</p>
+                    <pre><code># Triggered when player enters the temple area
+[temple_entrance]
 @event:enter_temple
 narrator: "The ancient temple looms before you..."
+@end
 
-# @end - Conversation ends, return to gameplay
-[equip_gear]
-@talk:officer {!has_item:uniform}
-officer: "Get your gear from the locker."
+# Triggered when exploration phase begins
+[start_exploration]
+@event:exploration_start
+officer: "Scout the area. Report back when ready."
 @end</code></pre>
-                    <p class="guide-tip">💡 Multiple @talk triggers for the same NPC are evaluated in order — first matching condition wins. Use @end to exit dialogue and let the player explore.</p>
+                    <p class="guide-tip">💡 Use <code>@talk:npc</code> for NPC conversations, <code>@event:name</code> for scripted moments.</p>
                 </section>
 
                 <!-- Stacked Nodes -->
