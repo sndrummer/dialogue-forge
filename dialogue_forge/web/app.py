@@ -607,6 +607,108 @@ def find_exploratory_path_to_node(dialogue, target_node: str) -> Tuple[Optional[
     return chosen
 
 
+def find_tree_entry_and_path(dialogue, target_node: str) -> Tuple[Optional[List[str]], Optional[WebGameState]]:
+    """
+    Fallback pathfinding: find the entry point of the disconnected tree
+    containing target_node, then compute path from there.
+
+    1. Build reverse graph to find what can reach target
+    2. Find a trigger node that can reach target (tree entry point)
+    3. Compute path from that entry to target
+    4. Build state by walking that path
+    """
+    if target_node not in dialogue.nodes:
+        return None, None
+
+    # Build forward graph: node -> list of reachable nodes
+    forward = {}
+    for node_id, node in dialogue.nodes.items():
+        forward[node_id] = []
+        for choice in node.choices:
+            if choice.target != "END" and choice.target in dialogue.nodes:
+                forward[node_id].append(choice.target)
+
+    # Build reverse graph: node -> list of nodes that can reach it
+    reverse = {node_id: [] for node_id in dialogue.nodes}
+    for node_id, targets in forward.items():
+        for target in targets:
+            if target in reverse:
+                reverse[target].append(node_id)
+
+    # BFS backwards from target to find all nodes that can reach it
+    can_reach_target = {target_node}
+    queue = deque([target_node])
+    while queue:
+        node = queue.popleft()
+        for predecessor in reverse.get(node, []):
+            if predecessor not in can_reach_target:
+                can_reach_target.add(predecessor)
+                queue.append(predecessor)
+
+    # Find trigger nodes that can reach target (potential tree entry points)
+    entry_candidates = []
+    for node_id in can_reach_target:
+        node = dialogue.nodes.get(node_id)
+        if node and node.triggers:
+            entry_candidates.append((node_id, node))
+
+    if not entry_candidates:
+        return None, None
+
+    # Pick the first entry candidate (could be smarter about this)
+    entry_node_id, entry_node = entry_candidates[0]
+
+    # Now find path from entry to target using simple BFS
+    initial_state = WebGameState()
+
+    # Grant the trigger's condition
+    for trigger in entry_node.triggers:
+        if trigger.condition:
+            initial_state.grant_condition(trigger.condition)
+        break
+
+    # Execute commands at entry node
+    for cmd in entry_node.commands:
+        initial_state.execute_command(cmd)
+
+    if entry_node_id == target_node:
+        return [entry_node_id], initial_state
+
+    # BFS from entry to target
+    queue = deque([(entry_node_id, [entry_node_id], initial_state)])
+    visited = {entry_node_id}
+
+    while queue:
+        current, path, state = queue.popleft()
+
+        if current == target_node:
+            return path, state
+
+        node = dialogue.nodes.get(current)
+        if not node:
+            continue
+
+        for choice in node.choices:
+            next_node = choice.target
+            if next_node == "END" or next_node not in dialogue.nodes:
+                continue
+            if next_node in visited:
+                continue
+
+            # Check condition (be lenient - grant if needed)
+            new_state = state.copy()
+            if choice.condition and not new_state.evaluate_condition(choice.condition):
+                new_state.grant_condition(choice.condition)
+
+            for cmd in dialogue.nodes[next_node].commands:
+                new_state.execute_command(cmd)
+
+            visited.add(next_node)
+            queue.append((next_node, path + [next_node], new_state))
+
+    return None, None
+
+
 def create_app(dialogues_root=None):
     """Create and configure the Flask application"""
     app = Flask(__name__)
@@ -922,7 +1024,22 @@ def create_app(dialogues_root=None):
                 path, state = find_valid_path_to_node(dialogue, target_node)
 
             if path is None:
-                # No valid path found - start with empty state
+                # Try fallback: find tree entry point and path from there
+                path, state = find_tree_entry_and_path(dialogue, target_node)
+
+                if path is not None:
+                    return jsonify(
+                        {
+                            "success": True,
+                            "path": path,
+                            "path_length": len(path),
+                            "mode": mode,
+                            "state": state.to_dict(),
+                            "info": f"Starting from tree entry '{path[0]}' (disconnected from main start)",
+                        }
+                    )
+
+                # Still no path - start with empty state
                 return jsonify(
                     {
                         "success": True,
