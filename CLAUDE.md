@@ -157,6 +157,36 @@ Note: `parser/node.py` contains legacy dataclasses that are not currently used.
 - `[start]` - Optional explicit start node (otherwise first node is used)
 - `END` - Choice target to end conversation
 
+### Triggers & Exit Points
+Triggers define how dialogue nodes are entered from gameplay:
+
+```dlg
+# Talk trigger - player talks to NPC
+[greet_player]
+@talk:officer
+officer: "Welcome!"
+
+# Conditional talk trigger
+[report_ready]
+@talk:officer {has_uniform}
+officer: "Ready for duty?"
+
+# Event trigger - custom game events
+[enter_temple]
+@event:temple_entrance
+narrator: "The temple looms..."
+
+# Exit point - return to gameplay
+[exploration]
+narrator: "Explore the area."
+@end
+```
+
+- `@talk:npc_id` - Trigger when talking to NPC (evaluated in reverse order - latest matching wins)
+- `@talk:npc_id {condition}` - Conditional talk trigger
+- `@event:event_name` - Trigger on custom game event
+- `@end` - Exit dialogue, return to gameplay (can have conditions)
+
 ## Validation Logic
 
 The validator (`cli/validate_cmd.py`) performs these passes:

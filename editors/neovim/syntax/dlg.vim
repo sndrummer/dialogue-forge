@@ -20,18 +20,11 @@ syn match dlgNode "^\s*\[[^\]]\+\]"
 " Special sections
 syn match dlgSpecialNode "^\s*\[\(start\|characters\|state\)\]"
 
-" Entry group sections [entry:name]
-syn match dlgEntryNode "^\s*\[entry:\w\+\]"
+" Triggers (@talk:npc, @event:name)
+syn match dlgTrigger "^\s*@\(talk\|event\):\w\+" nextgroup=dlgCondition skipwhite
 
-" Entry routes (condition -> target)
-syn match dlgEntryRoute "^\s*\w[^-]*->" nextgroup=dlgEntryTarget skipwhite contained
-syn match dlgEntryTarget "\w\+" contained
-
-" Default entry route (-> target)
-syn match dlgDefaultEntry "^\s*->\s\+\w\+" contains=dlgChoice,dlgEntryTarget
-
-" Exit markers (<- node)
-syn match dlgExitMarker "^\s*<-\s*\w\+"
+" Exit marker (@end)
+syn match dlgExitMarker "^\s*@end\>"
 
 " Character definitions in [characters] section
 syn match dlgCharacterDef "^\s*\w\+:" nextgroup=dlgCharacterName skipwhite
@@ -108,10 +101,7 @@ hi def link dlgTag            Type
 hi def link dlgTagBracket     Type
 hi def link dlgTagName        Type
 hi def link dlgTagComma       Type
-hi def link dlgEntryNode      PreProc
-hi def link dlgEntryRoute     Special
-hi def link dlgEntryTarget    Function
-hi def link dlgDefaultEntry   Special
+hi def link dlgTrigger        PreProc
 hi def link dlgExitMarker     WarningMsg
 
 let b:current_syntax = "dlg"

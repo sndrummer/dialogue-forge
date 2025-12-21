@@ -101,6 +101,40 @@ npc: "Nice to meet you! How can I help?"
 - `{a && b}` - AND condition
 - `{a || b}` - OR condition
 
+### Triggers & Exits
+
+Triggers define how dialogue is started from gameplay:
+
+```dlg
+# Talk trigger - when player talks to an NPC
+[greet_player]
+@talk:officer
+officer: "Welcome, recruit!"
+-> get_orders: "Yes, sir!"
+
+# Conditional talk trigger
+[report_in]
+@talk:officer {has_uniform}
+officer: "Ready for duty?"
+
+# Event trigger - custom game events
+[enter_temple]
+@event:temple_entrance
+narrator: "The ancient temple looms..."
+
+# Exit marker - return to gameplay
+[exploration]
+narrator: "You can explore the area."
+@end
+```
+
+- `@talk:npc_id` - Trigger when player talks to NPC
+- `@talk:npc_id {condition}` - Conditional talk trigger
+- `@event:event_name` - Trigger on custom game event
+- `@end` - Exit dialogue, return to gameplay
+
+Multiple `@talk` triggers for the same NPC are evaluated in reverse order (latest first) - the first matching condition wins.
+
 ## Web Editor
 
 The web editor provides:
