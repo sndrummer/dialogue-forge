@@ -18,6 +18,8 @@ export class DialoguePlayer {
         this.typewriterSpeed = 10; // ms per character (fast speed - default)
         this.modal = null;
         this.visitedPath = []; // Track path taken during playback
+        this.knownItems = []; // Items found in dialogue (give_item, has_item)
+        this.knownCompanions = []; // Companions found in dialogue (add_companion, companion:)
     }
 
     async play(startNode = null, initialState = null, skipPathReset = false) {
@@ -41,6 +43,8 @@ export class DialoguePlayer {
             this.characters = data.characters || {};
             this.initialStateCommands = data.initial_state || [];
             this.entries = data.entries || {};
+            this.knownItems = data.stats?.known_items || [];
+            this.knownCompanions = data.stats?.known_companions || [];
             const startNodeId = startNode || data.start_node;
 
             // Convert graph nodes to dialogue format
@@ -599,7 +603,7 @@ export class DialoguePlayer {
         html += '</div>';
         html += '</div>';
 
-        // Inventory section - checkboxes
+        // Inventory section - checkboxes + known items
         html += '<div class="state-section">';
         html += '<h4>Inventory</h4>';
         html += '<div class="edit-state-inventory">';
@@ -613,15 +617,26 @@ export class DialoguePlayer {
         } else {
             html += '<p class="state-empty">(empty)</p>';
         }
-        // Add new item
+        // Known items quick-add buttons
+        const availableItems = this.knownItems.filter(item => !this.state.inventory.has(item));
+        if (availableItems.length > 0) {
+            html += '<div class="known-items-section">';
+            html += '<label class="known-label">Known items:</label>';
+            html += '<div class="known-buttons">';
+            for (const item of availableItems) {
+                html += `<button class="btn btn-xs btn-outline known-item-btn" data-known-item="${item}">+ ${item}</button>`;
+            }
+            html += '</div></div>';
+        }
+        // Add new item (custom)
         html += `<div class="edit-state-add">
-            <input type="text" class="new-item-name" placeholder="new_item">
+            <input type="text" class="new-item-name" placeholder="custom_item">
             <button class="btn btn-sm add-item-btn">+</button>
         </div>`;
         html += '</div>';
         html += '</div>';
 
-        // Companions section - checkboxes
+        // Companions section - checkboxes + known companions
         html += '<div class="state-section">';
         html += '<h4>Companions</h4>';
         html += '<div class="edit-state-companions">';
@@ -635,9 +650,20 @@ export class DialoguePlayer {
         } else {
             html += '<p class="state-empty">(none)</p>';
         }
-        // Add new companion
+        // Known companions quick-add buttons
+        const availableCompanions = this.knownCompanions.filter(c => !this.state.companions.has(c));
+        if (availableCompanions.length > 0) {
+            html += '<div class="known-companions-section">';
+            html += '<label class="known-label">Known companions:</label>';
+            html += '<div class="known-buttons">';
+            for (const companion of availableCompanions) {
+                html += `<button class="btn btn-xs btn-outline known-companion-btn" data-known-companion="${companion}">+ ${companion}</button>`;
+            }
+            html += '</div></div>';
+        }
+        // Add new companion (custom)
         html += `<div class="edit-state-add">
-            <input type="text" class="new-companion-name" placeholder="new_companion">
+            <input type="text" class="new-companion-name" placeholder="custom_companion">
             <button class="btn btn-sm add-companion-btn">+</button>
         </div>`;
         html += '</div>';
@@ -700,6 +726,24 @@ export class DialoguePlayer {
                 this.state.companions.add(nameInput.value.trim());
                 this.updateEditStatePanel();
             }
+        });
+
+        // Known items quick-add buttons
+        content.querySelectorAll('.known-item-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const item = btn.dataset.knownItem;
+                this.state.inventory.add(item);
+                this.updateEditStatePanel();
+            });
+        });
+
+        // Known companions quick-add buttons
+        content.querySelectorAll('.known-companion-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const companion = btn.dataset.knownCompanion;
+                this.state.companions.add(companion);
+                this.updateEditStatePanel();
+            });
         });
     }
 

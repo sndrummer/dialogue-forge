@@ -83,6 +83,27 @@ class DialogueParser:
     def __init__(self):
         self.dialogue: Dialogue = Dialogue()
         self.current_line_number: int = 0
+        # Track known items and companions for editor convenience
+        self.known_items: Set[str] = set()
+        self.known_companions: Set[str] = set()
+
+    def _track_items_and_companions(self, text: str):
+        """Extract and track items/companions from commands or conditions"""
+        # Track from commands: *give_item X, *remove_item X, *add_companion X, *remove_companion X
+        if text.startswith("give_item ") or text.startswith("remove_item "):
+            parts = text.split()
+            if len(parts) >= 2:
+                self.known_items.add(parts[1])
+        elif text.startswith("add_companion ") or text.startswith("remove_companion "):
+            parts = text.split()
+            if len(parts) >= 2:
+                self.known_companions.add(parts[1])
+
+        # Track from conditions: has_item:X, companion:X
+        for match in re.finditer(r"has_item:(\w+)", text):
+            self.known_items.add(match.group(1))
+        for match in re.finditer(r"companion:(\w+)", text):
+            self.known_companions.add(match.group(1))
 
     def _extract_tags(self, text: str) -> Tuple[str, List[str]]:
         """
@@ -446,6 +467,7 @@ class DialogueParser:
             if line.startswith("*"):
                 cmd_text = line[1:].strip()
                 self.dialogue.initial_state.append(cmd_text)
+                self._track_items_and_companions(cmd_text)
                 # Validate command syntax at parse time
                 cmd_warnings = self.validate_command_syntax(cmd_text, i + 1)
                 self.dialogue.warnings.extend(cmd_warnings)
@@ -524,6 +546,7 @@ class DialogueParser:
                 if condition:
                     condition_warnings = self.validate_condition_syntax(condition, i + 1)
                     self.dialogue.warnings.extend(condition_warnings)
+                    self._track_items_and_companions(condition)
 
                 route = EntryRoute(condition=condition, target=target, line_number=i + 1)
                 entry_group.routes.append(route)
@@ -578,6 +601,7 @@ class DialogueParser:
             if stripped.startswith("*"):
                 cmd_text = stripped[1:].strip()
                 primary_node.commands.append(cmd_text)
+                self._track_items_and_companions(cmd_text)
                 # Validate command syntax at parse time
                 cmd_warnings = self.validate_command_syntax(cmd_text, i + 1)
                 self.dialogue.warnings.extend(cmd_warnings)
@@ -724,6 +748,7 @@ class DialogueParser:
                 if condition:
                     condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
                     self.dialogue.warnings.extend(condition_warnings)
+                    self._track_items_and_companions(condition)
 
                 choice = Choice(target=target, text=text, condition=condition, line_number=start_index + 1)
                 node.choices.append(choice)
@@ -761,6 +786,7 @@ class DialogueParser:
             if condition:
                 condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
                 self.dialogue.warnings.extend(condition_warnings)
+                self._track_items_and_companions(condition)
 
             choice = Choice(target=target, text=text, condition=condition, line_number=start_index + 1)
         else:
@@ -779,6 +805,7 @@ class DialogueParser:
                 if condition:
                     condition_warnings = self.validate_condition_syntax(condition, start_index + 1)
                     self.dialogue.warnings.extend(condition_warnings)
+                    self._track_items_and_companions(condition)
 
                 choice = Choice(
                     target=target,
@@ -910,4 +937,6 @@ class DialogueParser:
             "initial_state_commands": len(self.dialogue.initial_state),
             "errors": len(self.dialogue.errors),
             "warnings": len(self.dialogue.warnings),
+            "known_items": sorted(list(self.known_items)),
+            "known_companions": sorted(list(self.known_companions)),
         }

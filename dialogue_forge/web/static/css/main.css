@@ -1685,6 +1685,50 @@ body {
     flex-shrink: 0;
 }
 
+/* Known items/companions quick-add section */
+.known-items-section,
+.known-companions-section {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.known-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.known-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.btn-xs {
+    padding: 3px 8px;
+    font-size: 11px;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-outline:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.known-item-btn,
+.known-companion-btn {
+    transition: all 0.15s ease;
+}
+
 /* State Import/Export - now inside unified panel */
 .play-state-io-content {
     padding: 16px;
